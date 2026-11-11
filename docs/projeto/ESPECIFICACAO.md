@@ -1,6 +1,6 @@
 # Modulock — especificação do controle de acesso ESP32
 
-> **MOD-DOC v1.0.0** · 11/11/2026 · código auditado `a83b7fd3d97d5a356e869e172ccaf761aceb150b` · documentação por inspeção estática, sem validação do hardware.
+> **MOD-DOC v2.0.0 proposta** · 11/11/2026 · código auditado `a83b7fd3d97d5a356e869e172ccaf761aceb150b` · documentação por inspeção estática, sem validação do hardware.
 
 ## Finalidade e fronteiras de confiança
 Firmware Arduino para ESP32 que aciona relé físico a partir de cartão RFID ou interface administrativa HTTP; armazena lista de usuários/identificadores em SPIFFS. **Não é uma fechadura certificada**, e sua implantação em porta real deve ser precedida por ensaios elétricos, autenticação e segurança física.
@@ -45,3 +45,14 @@ Firmware Arduino para ESP32 que aciona relé físico a partir de cartão RFID ou
 - O sistema não possui suíte automatizada de integração ESP32/RFID no repositório.
 - Não mostrar credenciais, UID completo ou usuários reais em logs de produção.
 - Sem HTTPS e política de proteção da conexão, não expor porta 80 na internet.
+
+## Correção P0 proposta: leitura e cadastro de UID
+
+- `GET /getLastScannedUid` agora exige sessão autenticada (401 quando ausente/inválida), valida TTL de 30s e responde com `Cache-Control: no-store`.
+- `POST /registerUser` continua exigindo sessão e também exige que o UID informado seja **igual ao último UID fisicamente lido**, dentro do prazo; UID é consumido após cadastro bem-sucedido.
+- Comandos Bluetooth antigos `OPEN DOOR`, `ADD USER`, `REMOVE USER` e `GET USERS` foram **removidos do firmware compilável** por falta de autenticação do canal; Bluetooth já não era inicializado na main.
+- A UI de registro mantém polling de 1 segundo, mas o endpoint devolve 401 sem login; JS deve tratar sessão expirada no futuro.
+- `include/ModulockAccessPolicy.h` contém a lógica de validade temporal independente do Arduino, testada com `g++` inclusive em overflow do contador; `test/test_security_wiring.py` verifica ligações dos guardas ao firmware.
+- Esta revisão **não** torna RFID UID criptograficamente resistente a clones, não adiciona HTTPS, não fecha os riscos de sessão/CSRF, e não foi gravada em hardware.
+
+[Política detalhada](POLITICA_SESSAO_UID.md).
