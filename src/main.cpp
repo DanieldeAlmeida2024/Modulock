@@ -6,7 +6,14 @@
 #include <MFRC522.h>
 #include <ArduinoJson.h>
 #include <FS.h>      
-#include <SPIFFS.h>  
+#include <SPIFFS.h>
+#include <esp_system.h>
+#include <cstring>
+#if __has_include("ModulockSecrets.h")
+#include "ModulockSecrets.h"
+#else
+#include "ModulockSecrets.example.h"
+#endif
 
 #define RST_PIN 22   
 #define SS_PIN 21   
@@ -14,12 +21,14 @@
 #define ledVerde 13   
 #define ledVermelho 14   
 
-const char* WEB_USERNAME = "admin"; 
-const char* WEB_PASSWORD = "123";   
-const char* USERS_FILE_PATH = "/users.json"; 
+const char* WEB_USERNAME = MODULOCK_WEB_USERNAME;
+const char* WEB_PASSWORD = MODULOCK_WEB_PASSWORD;
+const char* USERS_FILE_PATH = "/users.json";
+const char* WIFI_SSID = MODULOCK_WIFI_SSID;
+const char* WIFI_PASSWORD = MODULOCK_WIFI_PASSWORD;
 
-const char* WIFI_SSID = "VIVOFIBRA-E150"; 
-const char* WIFI_PASSWORD = "D07F134963"; 
+String identificadorSessao;
+bool servidorHabilitado = false; 
 
 const unsigned long DOOR_OPEN_DURATION_MS = 1000; 
 const unsigned long LED_FLASH_DURATION_MS = 2000; 
@@ -242,15 +251,21 @@ void flashLED(int pin) {
 }
 
 
+// A presenca de Cookie nao basta: seu valor deve coincidir com a sessao vigente.
 bool isAuthenticated(AsyncWebServerRequest *request) {
-    if (request->hasHeader("Cookie")) {
-        String cookieHeader = request->getHeader("Cookie")->value();
-        int idx = cookieHeader.indexOf("session_id=");
-        if (idx != -1) {
-            return true;
-        }
-    }
-    return false;
+  if (identificadorSessao.isEmpty() || !request->hasHeader("Cookie")) return false;
+  String cookies = request->getHeader("Cookie")->value();
+  int inicio = 0;
+  while (inicio < cookies.length()) {
+    int fim = cookies.indexOf(';', inicio);
+    if (fim < 0) fim = cookies.length();
+    String cookie = cookies.substring(inicio, fim);
+    cookie.trim();
+    if (cookie.startsWith("session_id=") &&
+        cookie.substring(strlen("session_id=")) == identificadorSessao) return true;
+    inicio = fim + 1;
+  }
+  return false;
 }
 
 void handleRoot(AsyncWebServerRequest *request) {
@@ -310,7 +325,7 @@ void handleLogin(AsyncWebServerRequest *request) {
 
     if (username == WEB_USERNAME && password == WEB_PASSWORD) {
       AsyncWebServerResponse *response = request->beginResponse(302, "text/plain", "");
-      response->addHeader("Set-Cookie", "session_id=admin_session; Path=/"); 
+      response->addHeader("Set-Cookie", "session_id=" + identificadorSessao + "; Path=/; HttpOnly; SameSite=Strict"); 
       response->addHeader("Location", "/dashboard");
       request->send(response);
 
@@ -677,15 +692,33 @@ void setup() {
 
   loadUsers(); 
   
-  serializeJson(usersDoc, Serial); 
+  // Nao registrar a lista de pessoas/RFID na porta serial.
 
-  SerialBT.begin("ESP32_RFID_Access");
+  // Entrada de comandos Bluetooth permanece desativada, pois nao autenticava operadores.
+  // Um protocolo autenticado deve ser implementado e testado antes de reativar.
+  Serial.println("Bluetooth de comandos desativado por seguranca.");
 
-  Serial.println(WIFI_SSID);
+  // SSID e senha nunca sao registrados em logs.
+  if (strlen(WIFI_SSID) == 0 || strlen(WIFI_PASSWORD) == 0 ||
+      strlen(WEB_USERNAME) == 0 || strlen(WEB_PASSWORD) < 12) {
+    Serial.println("Configure include/ModulockSecrets.h com credenciais locais seguras.");
+    return;
+  }
+  identificadorSessao.reserve(64);
+  for (int i = 0; i < 8; ++i) {
+    char parte[9];
+    snprintf(parte, sizeof(parte), "%08x", static_cast<unsigned int>(esp_random()));
+    identificadorSessao += parte;
+  }
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  while (WiFi.status() != WL_CONNECTED) {
+  unsigned long inicioConexao = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - inicioConexao < 30000) {
     delay(500);
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Falha de Wi-Fi: servidor nao iniciado.");
+    return;
   }
 
   Serial.println("");
@@ -716,11 +749,13 @@ void setup() {
   server.onNotFound(handleNotFound);
 
   server.begin();
+  servidorHabilitado = true;
   Serial.println("Servidor Web iniciado!");
 }
 
 
 void loop() {
+  if (!servidorHabilitado) { delay(1000); return; }
   if (relayOffTime != 0 && millis() >= relayOffTime) {
     digitalWrite(pinRele, HIGH);
     relayOffTime = 0;
