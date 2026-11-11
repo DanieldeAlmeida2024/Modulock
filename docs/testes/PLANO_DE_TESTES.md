@@ -48,3 +48,8 @@ Executar inicialmente **sem fechadura energizada**. Usar uma carga de teste adeq
 | MOD-T26 | Build firmware | `pio run -e esp32dev` passa sem dependências faltando | CI PlatformIO |
  
 Os 18 casos anteriores continuam planejados. Os testes C++ isolam **política**, e o teste Python verifica o código-fonte — não são substitutos da execução do ESP32 com RFID, relé e HTTP reais.
+
+
+### Resultado da automação da revisão
+
+[Workflow #43089433513](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43089433513) **aprovado**: política C++11 (`g++`) e ligação de handlers (Python) aprovadas; compilação ESP32 com PlatformIO aprovada. MOD-T19–T23 continuam exigindo validação de HTTP/RFID real e MOD-T26 comprova apenas build, não operação elétrica.

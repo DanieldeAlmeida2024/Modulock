@@ -22,3 +22,8 @@ O UID de cartão RFID é um identificador de credencial; divulgá-lo pode facili
 - Teste HIL em bancada sem fechadura: leitura recente, expiração, sessão inválida, consumo de UID após cadastro, power cycle e operação do relé.
 - Não há homologação para controle de acesso físico em produção. Devem existir plano de emergência de saída, conformidade elétrica e avaliação dos riscos de clonagem dos cartões.
 - Não promover segurança com base apenas no fato de Bluetooth não inicializar; ausência de comandos é protegida por teste de regressão na nova build.
+
+
+## Execução da verificação de código e firmware
+
+**CI aprovado em 11/11/2026:** [run #43089433513](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43089433513), incluindo teste host de TTL, overflow, UID idêntico e falha de autorização, inspeção de ligação das rotas e compilação PlatformIO do ESP32. **HIL, rede real, cookies e hardware de relé não testados**. O resultado não certifica a fechadura.
