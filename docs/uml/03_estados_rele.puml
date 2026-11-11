@@ -1,0 +1,10 @@
+@startuml
+[*] --> DESLIGADO : boot GPIO4 HIGH
+DESLIGADO --> ENERGIZADO : UID autorizado / HTTP válido
+ENERGIZADO --> DESLIGADO : prazo 1000 ms
+note right of ENERGIZADO
+Ensaiar com carga de teste.
+RESET/queda de energia requer
+verificação fail-safe.
+end note
+@enduml
