@@ -24,3 +24,12 @@ ESP32, MFRC522, módulo relé compatível, LEDs, fonte e conversor adequados ao 
 
 ## Status
 Alteração de segurança em **revisão**. Compilação PlatformIO e testes de ponta a ponta no ESP32 ainda obrigatórios. Não há garantia de uso seguro em ambientes reais.
+
+## Documentação técnica Modulock v1.0.0
+
+- [Especificação do hardware e firmware](docs/projeto/ESPECIFICACAO.md)
+- [Três diagramas UML](docs/uml/README.md)
+- [Matriz de testes e segurança](docs/testes/PLANO_DE_TESTES.md)
+- [Controle de versão](docs/controle/VERSIONAMENTO.md)
+
+> Hardware físico: não considerar a implementação pronta para uma porta real sem testes de autenticação, Bluetooth e falha segura.

@@ -1,0 +1,19 @@
+@startuml
+actor Administrador
+participant "Servidor HTTP" as HTTP
+participant "isAuthenticated" as Auth
+participant "ativarRelePorta" as Rele
+participant "loop" as Loop
+Administrador -> HTTP : POST /openDoor + Cookie
+HTTP -> Auth : validar session_id
+alt sessão inválida
+  Auth --> HTTP : false
+  HTTP --> Administrador : 401
+else sessão válida
+  Auth --> HTTP : true
+  HTTP -> Rele : ativar
+  Rele -> Rele : GPIO4 LOW; relayOffTime=millis()+1000
+  HTTP --> Administrador : 200
+  Loop -> Rele : após prazo, GPIO4 HIGH
+end
+@enduml

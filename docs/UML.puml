@@ -1,13 +1,24 @@
 @startuml
-actor Administrador
-component "Web HTTP" as Web
-component "Validador de Sessao" as Sessao
-component "RFID MFRC522" as Leitor
-component "Controle de Rele" as Rele
-database SPIFFS
-Administrador --> Web
-Web --> Sessao
-Sessao --> Rele
-Leitor --> Rele
-SPIFFS --> Rele
+node "ESP32 esp32dev" {
+  component "setup()/loop()" as Loop
+  component "MFRC522 (SPI)" as RFID
+  component "AsyncWebServer :80" as HTTP
+  component "BluetoothSerial" as BT
+  component "isAuthenticated()" as Auth
+  component "addUser/removeUser" as Cad
+  database "SPIFFS /users.json" as Users
+  component "Relé GPIO4" as Relay
+  component "LEDs 13/14" as LED
+}
+RFID --> Loop : UID
+HTTP --> Auth : Cookie
+Auth --> Cad : sessão validada
+Cad --> Users
+BT --> Loop : comando (revisar segurança)
+Loop --> Relay : LOW/HIGH
+Loop --> LED
+note bottom
+Pinagem: RST22, SS21, Relé4, Verde13, Vermelho14
+Não expor HTTP na internet sem transporte seguro.
+end note
 @enduml
