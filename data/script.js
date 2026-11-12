@@ -1,4 +1,14 @@
 // Funções da página de login e gerenciamento
+async function modulockCsrfHeaders() {
+  const response = await fetch('/session/csrf', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Sessão inválida');
+  const { csrfToken } = await response.json();
+  return { 'X-Modulock-CSRF': csrfToken };
+}
+function logout() {
+  return modulockCsrfHeaders().then(headers => fetch('/logout', { method: 'POST', headers }))
+    .finally(() => { window.location.href = '/'; });
+}
 window.onload = function() {
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has('error') && urlParams.get('error') === '1') {
@@ -16,9 +26,9 @@ window.onload = function() {
 };
 
 function openDoor() {
-  fetch('/openDoor', {
-      method: 'POST'
-    })
+  modulockCsrfHeaders().then(headers => fetch('/openDoor', {
+      method: 'POST', headers
+    }))
     .then(response => response.text())
     .then(data => {
       alert(data);
@@ -60,13 +70,11 @@ function getUsers() {
 
 function removeUser(ra) {
   if (confirm('Are you sure you want to remove user ' + ra + '?')) {
-    fetch('/removeUser', {
+    modulockCsrfHeaders().then(headers => fetch('/removeUser', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: 'ra=' + ra
-      })
+        headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'ra=' + encodeURIComponent(ra)
+      }))
       .then(response => response.text())
       .then(data => {
         alert(data);
@@ -123,13 +131,11 @@ function registerUser() {
     return;
   }
 
-  fetch('/registerUser', {
+  modulockCsrfHeaders().then(headers => fetch('/registerUser', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: 'ra=' + ra + '&name=' + name + '&uid=' + uid
-    })
+      headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ ra, name, uid })
+    }))
     .then(response => response.text())
     .then(data => {
       if (messageElement) {
