@@ -68,3 +68,7 @@ Os 18 casos anteriores continuam planejados. Os testes C++ isolam **política**,
 | MOD-T34 | Relé e LEDs com placa real, brownout, watchdog e overflow | **Pendente HIL**, ensaio sem fechadura energizada |
 
 O workflow `.github/workflows/security-ci.yml` executa g++ host, duas inspeções Python e compilação ESP32. Testes estáticos **não provam** 1.000 ms de pulso físico, nem ausência de race condition em callbacks assíncronos. Registrar SHA e URL de run exatos após o CI.
+
+## MOD-SESSION v2.2.0 proposta
+
+Casos MOD-S01..13 cobrindo login rotativo, CSRF, revogação, TTL e build; testes de rede real, hardware e TLS ainda pendentes. [Matriz própria](SESSAO_CSRF.md).

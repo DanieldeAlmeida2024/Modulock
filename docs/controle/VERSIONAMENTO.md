@@ -38,3 +38,23 @@
 | MOD-DOC | `docs/projeto/RELE_TEMPORIZACAO.md` e UML #05 | Riscos, estados, diagnóstico, HIL pendente |
 
 Branch `fix/timing-rollover-and-serial-privacy-20261111`, empilhada sobre o PR #3. Código e diagrama propõem correção de software **sem homologação elétrica nem autorização de flash**. Não liberar antes de ensaio HIL e revisão de sincronização entre tarefas, rede HTTP, sessões/CSRF e segurança dos cartões.
+
+## MOD-SESSION v2.2.0 proposta — 11/11/2026
+
+| ID | Artefato | Mudança |
+|---|---|---|
+| MOD-SESS | `include/ModulockSessionPolicy.h`, `src/main.cpp` | Sessão única renovada a cada login, hash do cookie, timeout, CSRF e logout servidor |
+| MOD-UI | `src/main.cpp` HTML e `data/script.js` | `X-Modulock-CSRF` em todas as mutações; logout POST |
+| MOD-TST | `test/session_policy_test.cpp`, `test/test_session_wiring.py` | Testes C++ de TTL/revogação e inspeção de rotas |
+| MOD-UML | `docs/uml/06_sessao_revogacao_csrf.puml` | Sequência editável do fluxo seguro proposto |
+| MOD-DOC | `docs/projeto/SESSOES_OPERADOR.md`, `docs/testes/SESSAO_CSRF.md` | Projeto/risco/testes específicos |
+
+Build e testes devem ser verificados no commit final. Ainda há HTTP sem TLS, UID clonável, login sem rate limit e HIL pendente. Sem flash, merge ou release.
+
+## Evidência verificável de CI — MOD-SESSION v2.2.0
+
+- Código, UI, documentação e teste de wiring validados em commit `62a1723266000d03b61e7bf5d78326a41a912cb8`.
+- [GitHub Actions #43140032017](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43140032017) e [#43140037802](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43140037802): **ambos SUCCESS**, incluindo política C++/Python e compilação firmware ESP32 com PlatformIO.
+- O primeiro run da implementação [#43139270800](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43139270800) foi **FAIL**, revelando API `mbedtls_sha256_ret` ausente em mbedTLS 3 e um oráculo incorreto do teste de inatividade após `valid()` atualizar `lastSeenAt`. Corrigidos; os runs seguintes expuseram e corrigiram um marcador obsoleto no teste de wiring.
+- Esses gates **não** abrangem HIL, HTTPS/TLS, prevenção de brute-force, ataques de rede, sincronização de GPIO/SPIFFS com revogação ou resistência de RFID à clonagem. Não há firmware gravado, equipamento acionado nem release autorizado.
+- Este registro posterior é somente documental; verificar novamente os checks do novo HEAD antes de qualquer merge.

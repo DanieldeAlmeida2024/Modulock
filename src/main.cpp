@@ -3,6 +3,10 @@
 #include <ESPAsyncWebServer.h>
 #include "ModulockAccessPolicy.h"
 #include "ModulockTimingPolicy.h"
+#include "ModulockSessionPolicy.h"
+#include <mbedtls/sha256.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include <SPI.h>
 #include <MFRC522.h>
 #include <ArduinoJson.h>
@@ -28,8 +32,9 @@ const char* USERS_FILE_PATH = "/users.json";
 const char* WIFI_SSID = MODULOCK_WIFI_SSID;
 const char* WIFI_PASSWORD = MODULOCK_WIFI_PASSWORD;
 
-String identificadorSessao;
-bool servidorHabilitado = false; 
+ModulockAdminSession adminSession;
+SemaphoreHandle_t adminSessionMutex = nullptr;
+bool servidorHabilitado = false;
 
 const unsigned long DOOR_OPEN_DURATION_MS = 1000; 
 const unsigned long LED_FLASH_DURATION_MS = 2000; 
@@ -56,7 +61,10 @@ bool isAuthorized(byte *uid);
 String findUserByUid(byte *uid);
 String findUserByRa(const String& ra);
 
-bool isAuthenticated(AsyncWebServerRequest *request); 
+bool isAuthenticated(AsyncWebServerRequest *request);
+bool hasValidCsrf(AsyncWebServerRequest *request);
+void handleSessionCsrf(AsyncWebServerRequest *request);
+void handleLogout(AsyncWebServerRequest *request);
 void handleRoot(AsyncWebServerRequest *request);
 void handleLogin(AsyncWebServerRequest *request);
 void handleDashboard(AsyncWebServerRequest *request); 
@@ -256,21 +264,131 @@ void flashLED(int pin) {
 }
 
 
-// A presenca de Cookie nao basta: seu valor deve coincidir com a sessao vigente.
-bool isAuthenticated(AsyncWebServerRequest *request) {
-  if (identificadorSessao.isEmpty() || !request->hasHeader("Cookie")) return false;
-  String cookies = request->getHeader("Cookie")->value();
-  int inicio = 0;
-  while (inicio < cookies.length()) {
-    int fim = cookies.indexOf(';', inicio);
-    if (fim < 0) fim = cookies.length();
-    String cookie = cookies.substring(inicio, fim);
-    cookie.trim();
-    if (cookie.startsWith("session_id=") &&
-        cookie.substring(strlen("session_id=")) == identificadorSessao) return true;
-    inicio = fim + 1;
+// Token de cookie aleatório: valor bruto entregue somente no Set-Cookie.
+// O servidor guarda SHA-256 do cookie, e um nonce anti-CSRF por login.
+String modulockRandomHex() {
+  uint8_t bytes[32];
+  esp_fill_random(bytes, sizeof(bytes));
+  static const char hex[] = "0123456789abcdef";
+  char token[65];
+  for (size_t i=0; i<32; ++i) {
+    token[i*2] = hex[(bytes[i] >> 4) & 15];
+    token[i*2+1] = hex[bytes[i] & 15];
   }
-  return false;
+  token[64] = '\0';
+  memset(bytes, 0, sizeof(bytes));
+  return String(token);
+}
+
+String modulockCookieToken(AsyncWebServerRequest* request) {
+  if (!request->hasHeader("Cookie")) return "";
+  const String cookies = request->getHeader("Cookie")->value();
+  if (cookies.length() > 2048) return "";
+  String token = "";
+  bool seen = false;
+  int index = 0;
+  while (index < cookies.length()) {
+    int end = cookies.indexOf(';', index);
+    if (end < 0) end = cookies.length();
+    String cookie = cookies.substring(index, end);
+    cookie.trim();
+    if (cookie.startsWith("session_id=")) {
+      if (seen) return ""; // cookies duplicados são ambíguos
+      seen = true;
+      token = cookie.substring(strlen("session_id="));
+    }
+    index = end + 1;
+  }
+  if (!seen || token.length() != 64) return "";
+  for (size_t i=0; i<64; ++i) {
+    char ch = token[i];
+    if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'))) return "";
+  }
+  return token;
+}
+
+bool modulockCookieDigest(AsyncWebServerRequest* request, uint8_t digest[32]) {
+  const String cookie = modulockCookieToken(request);
+  if (cookie.length() != 64) return false;
+  return mbedtls_sha256(
+      reinterpret_cast<const unsigned char*>(cookie.c_str()),
+      cookie.length(), digest, 0) == 0;
+}
+
+// Acesso a estado compartilhado entre AsyncTCP e loop() requer mutex.
+// Todos os métodos da política são chamados apenas dentro do lock.
+bool modulockSessionCheck(AsyncWebServerRequest* request, bool mutation,
+                         bool revoke = false) {
+  uint8_t digest[32] = {0};
+  if (!adminSessionMutex || !modulockCookieDigest(request, digest)) return false;
+  String csrf;
+  if (mutation) {
+    if (!request->hasHeader("X-Modulock-CSRF")) return false;
+    csrf = request->getHeader("X-Modulock-CSRF")->value();
+    if (csrf.length() != 64) return false;
+  }
+  if (xSemaphoreTake(adminSessionMutex, pdMS_TO_TICKS(50)) != pdTRUE) return false;
+  const uint32_t now = static_cast<uint32_t>(millis());
+  const bool ok = revoke
+      ? adminSession.revoke(digest, csrf.c_str(), now)
+      : (mutation ? adminSession.mutationAllowed(digest, csrf.c_str(), now)
+                  : adminSession.valid(digest, now));
+  xSemaphoreGive(adminSessionMutex);
+  memset(digest, 0, sizeof(digest));
+  return ok;
+}
+
+bool isAuthenticated(AsyncWebServerRequest* request) {
+  return modulockSessionCheck(request, false);
+}
+
+bool hasValidCsrf(AsyncWebServerRequest* request) {
+  return modulockSessionCheck(request, true);
+}
+
+void handleSessionCsrf(AsyncWebServerRequest* request) {
+  uint8_t digest[32] = {0};
+  if (!adminSessionMutex || !modulockCookieDigest(request, digest)) {
+    request->send(401, "text/plain", "Não autorizado.");
+    return;
+  }
+  char csrf[65] = {0};
+  if (xSemaphoreTake(adminSessionMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+    request->send(503, "text/plain", "Sessão indisponível.");
+    return;
+  }
+  const bool ok = adminSession.csrfFor(
+      digest, static_cast<uint32_t>(millis()), csrf);
+  xSemaphoreGive(adminSessionMutex);
+  memset(digest, 0, sizeof(digest));
+  if (!ok) {
+    request->send(401, "text/plain", "Sessão expirada.");
+    return;
+  }
+  const String responseJson =
+      String(R"json({"csrfToken":")json") + String(csrf) + R"json("})json";
+  AsyncWebServerResponse* response =
+      request->beginResponse(200, "application/json", responseJson);
+  response->addHeader("Cache-Control", "no-store");
+  response->addHeader("Pragma", "no-cache");
+  request->send(response);
+  memset(csrf, 0, sizeof(csrf));
+}
+
+void handleLogout(AsyncWebServerRequest* request) {
+  if (!isAuthenticated(request)) {
+    request->send(401, "text/plain", "Sessão inválida.");
+    return;
+  }
+  if (!modulockSessionCheck(request, true, true)) {
+    request->send(403, "text/plain", "Token de requisição inválido.");
+    return;
+  }
+  AsyncWebServerResponse* response = request->beginResponse(204, "text/plain", "");
+  response->addHeader("Set-Cookie",
+      "session_id=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict");
+  response->addHeader("Cache-Control", "no-store");
+  request->send(response);
 }
 
 void handleRoot(AsyncWebServerRequest *request) {
@@ -329,8 +447,29 @@ void handleLogin(AsyncWebServerRequest *request) {
     String password = request->getParam("password", true)->value();
 
     if (username == WEB_USERNAME && password == WEB_PASSWORD) {
+      String token = modulockRandomHex();
+      String csrf = modulockRandomHex();
+      uint8_t digest[32] = {0};
+      if (!adminSessionMutex ||
+          mbedtls_sha256(reinterpret_cast<const unsigned char*>(token.c_str()),
+                             token.length(), digest, 0) != 0 ||
+          xSemaphoreTake(adminSessionMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+        request->send(503, "text/plain", "Não foi possível criar sessão.");
+        return;
+      }
+      const bool issued = adminSession.issue(
+          digest, csrf.c_str(), static_cast<uint32_t>(millis()));
+      xSemaphoreGive(adminSessionMutex);
+      memset(digest, 0, sizeof(digest));
+      csrf = "";
+      if (!issued) {
+        request->send(503, "text/plain", "Não foi possível criar sessão.");
+        return;
+      }
       AsyncWebServerResponse *response = request->beginResponse(302, "text/plain", "");
-      response->addHeader("Set-Cookie", "session_id=" + identificadorSessao + "; Path=/; HttpOnly; SameSite=Strict"); 
+      response->addHeader("Set-Cookie",
+          "session_id=" + token + "; Path=/; HttpOnly; SameSite=Strict");
+      response->addHeader("Cache-Control", "no-store");
       response->addHeader("Location", "/dashboard");
       request->send(response);
 
@@ -383,16 +522,23 @@ void handleDashboard(AsyncWebServerRequest *request) {
         </div>
       </div>
       <script>
+        async function csrfHeaders() {
+          const response = await fetch('/session/csrf', { cache: 'no-store' });
+          if (!response.ok) throw new Error('Sessão encerrada');
+          const { csrfToken } = await response.json();
+          return { 'X-Modulock-CSRF': csrfToken };
+        }
         function openDoor() {
-          fetch('/openDoor', { method: 'POST' })
+          csrfHeaders().then(headers => fetch('/openDoor', { method: 'POST', headers }))
             .then(response => response.text())
             .then(data => alert(data))
             .catch(error => console.error('Error:', error));
         }
 
         function logout() {
-            document.cookie = "session_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"; // Expira o cookie
-            window.location.href = "/"; 
+          csrfHeaders()
+            .then(headers => fetch('/logout', { method: 'POST', headers }))
+            .finally(() => { window.location.href = '/'; });
         }
 
         function loadUsers() {
@@ -423,13 +569,11 @@ void handleDashboard(AsyncWebServerRequest *request) {
           if (confirm('Are you sure you want to remove user with RA: ' + ra + '?')) {
             const formData = new URLSearchParams();
             formData.append('ra', ra);
-            fetch('/removeUser', {
+            csrfHeaders().then(headers => fetch('/removeUser', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-              },
+              headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
               body: formData
-            })
+            }))
             .then(response => response.text())
             .then(data => {
               alert(data);
@@ -453,6 +597,10 @@ void handleDashboard(AsyncWebServerRequest *request) {
 void handleAbrirPorta(AsyncWebServerRequest *request) {
   if (!isAuthenticated(request)) {
       request->send(401, "text/plain", "Não autorizado. Faça login.");
+      return;
+  }
+  if (!hasValidCsrf(request)) {
+      request->send(403, "text/plain", "Token de requisição inválido.");
       return;
   }
   ativarRelePorta();
@@ -525,6 +673,12 @@ void handlePaginaRegistro(AsyncWebServerRequest *request) {
 
         setInterval(fetchLastScannedUid, 1000);
 
+        async function csrfHeaders() {
+          const response = await fetch('/session/csrf', { cache: 'no-store' });
+          if (!response.ok) throw new Error('Sessão encerrada');
+          const { csrfToken } = await response.json();
+          return { 'X-Modulock-CSRF': csrfToken };
+        }
         function registerUser() {
           const ra = document.getElementById('raInput').value;
           const name = document.getElementById('nameInput').value;
@@ -542,13 +696,11 @@ void handlePaginaRegistro(AsyncWebServerRequest *request) {
           formData.append('name', name);
           formData.append('uid', uid);
 
-          fetch('/registerUser', {
+          csrfHeaders().then(headers => fetch('/registerUser', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
+            headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData
-          })
+          }))
           .then(response => response.text())
           .then(data => {
             messageElement.innerText = data;
@@ -580,6 +732,10 @@ void handleRegisterUser(AsyncWebServerRequest *request) {
       request->send(401, "text/plain", "Não autorizado. Faça login como admin.");
       return;
   }
+  if (!hasValidCsrf(request)) {
+      request->send(403, "text/plain", "Token de requisição inválido.");
+      return;
+  }
 
   if (request->hasParam("ra", true) && request->hasParam("name", true) && request->hasParam("uid", true)) {
     String ra = request->getParam("ra", true)->value();
@@ -600,7 +756,7 @@ void handleRegisterUser(AsyncWebServerRequest *request) {
       lastScannedUidForRegistration = "";
       lastUidScanTime = 0;
       request->send(200, "text/plain", "Usuário " + name + " (RA: " + ra + ") registrado com sucesso!");
-      Serial.println("Usuário registrado: " + name + " (RA: " + ra + ")");
+      Serial.println("Registro RFID concluído.");
     } else {
       request->send(200, "text/plain", "Erro: Falha ao registrar usuário. RA ou UID podem já existir ou campos vazios.");
     }
@@ -614,6 +770,10 @@ void handleRemoveUser(AsyncWebServerRequest *request) {
   Serial.println("Requisição POST recebida para /removeUser.");
   if (!isAuthenticated(request)) {
       request->send(401, "text/plain", "Não autorizado. Faça login como admin.");
+      return;
+  }
+  if (!hasValidCsrf(request)) {
+      request->send(403, "text/plain", "Token de requisição inválido.");
       return;
   }
 
@@ -688,11 +848,10 @@ void setup() {
     Serial.println("Configure include/ModulockSecrets.h com credenciais locais seguras.");
     return;
   }
-  identificadorSessao.reserve(64);
-  for (int i = 0; i < 8; ++i) {
-    char parte[9];
-    snprintf(parte, sizeof(parte), "%08x", static_cast<unsigned int>(esp_random()));
-    identificadorSessao += parte;
+  adminSessionMutex = xSemaphoreCreateMutex();
+  if (!adminSessionMutex) {
+    Serial.println("Falha ao iniciar controle de sessão; servidor não iniciado.");
+    return;
   }
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
@@ -713,6 +872,8 @@ void setup() {
 
   server.on("/", HTTP_GET, handleRoot);
   server.on("/login", HTTP_POST, handleLogin);
+  server.on("/session/csrf", HTTP_GET, handleSessionCsrf);
+  server.on("/logout", HTTP_POST, handleLogout);
   server.on("/dashboard", HTTP_GET, handleDashboard); 
 
   server.on("/openDoor", HTTP_POST, handleAbrirPorta);
@@ -741,6 +902,13 @@ void setup() {
 void loop() {
   if (!servidorHabilitado) { delay(1000); return; }
   const uint32_t now = static_cast<uint32_t>(millis());
+  static uint32_t lastSessionSweepAt = 0;
+  if (static_cast<uint32_t>(now - lastSessionSweepAt) >= 30000u &&
+      xSemaphoreTake(adminSessionMutex, 0) == pdTRUE) {
+    adminSession.expire(now);
+    xSemaphoreGive(adminSessionMutex);
+    lastSessionSweepAt = now;
+  }
   if (modulockTimedActionExpired(relayActive, now, relayActivatedAtMs,
                                 static_cast<uint32_t>(DOOR_OPEN_DURATION_MS))) {
     digitalWrite(pinRele, HIGH); // HIGH = relé desenergizado
