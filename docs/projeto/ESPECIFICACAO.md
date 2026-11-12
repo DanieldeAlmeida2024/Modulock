@@ -56,3 +56,6 @@ Firmware Arduino para ESP32 que aciona relé físico a partir de cartão RFID ou
 - Esta revisão **não** torna RFID UID criptograficamente resistente a clones, não adiciona HTTPS, não fecha os riscos de sessão/CSRF, e não foi gravada em hardware.
 
 [Política detalhada](POLITICA_SESSAO_UID.md).
+## MOD-TIME v2.1.0 — temporizadores do relé/LEDs e privacidade serial (proposta)
+
+O código anterior aplicava deadline absoluto `millis() + duração` e comparava `millis() >= deadline`. Em overflow de uint32, a janela do relé/LEDs podia terminar cedo. A revisão usa `ModulockTimingPolicy.h` com delta modular uint32 e flags de atividade; GPIO4 permanece LOW durante a janela e volta a HIGH no término, conforme polaridade programada. Também remove impressão de RA/nome/UID no log serial durante tentativa de cadastro. [Especificação e riscos](RELE_TEMPORIZACAO.md). **Não validar segurança física sem HIL**, especialmente sincronização entre callbacks assíncronos, carga elétrica, perda de energia e autenticação de usuários.

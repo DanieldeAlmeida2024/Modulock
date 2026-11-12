@@ -1,0 +1,28 @@
+@startuml
+title Modulock — saída temporizada com millis() modular (MOD-TIME v2.1.0)
+actor "RFID / Admin autenticado" as Source
+participant "ativarRelePorta()" as Activate
+participant "GPIO4 relé" as Relay
+participant "loop() ESP32" as Loop
+participant "ModulockTimingPolicy" as Policy
+
+Source -> Activate : pedido de abertura autorizado
+Activate -> Activate : relayActivatedAtMs = uint32(millis())\nrelayActive = true
+Activate -> Relay : LOW (energizado)
+
+loop Acompanhamento a cada iteração do firmware
+  Loop -> Policy : expired(relayActive, now, activatedAt, 1000)
+  alt delta modular menor que 1000ms
+    Policy --> Loop : false
+    note over Loop : Relé continua LOW
+  else duração >=1000ms (inclusive após wrap)
+    Policy --> Loop : true
+    Loop -> Relay : HIGH (desenergizado)
+    Loop -> Loop : relayActive = false
+  end
+end
+note over Loop,Policy
+LED verde/vermelho usam a mesma regra com 2000ms.
+Testes host verificam wrap; hardware real ainda pendente.
+end note
+@enduml

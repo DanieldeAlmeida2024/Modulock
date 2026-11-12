@@ -25,3 +25,16 @@
 ### Evidência de CI
 
 [GitHub Actions #43089433513](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43089433513): `Guardas UID - C++ host` = **success** e `Compilar firmware ESP32` = **success**. Não houve flash, teste HIL nem liberação de fechadura física.
+
+## MOD-TIME v2.1.0 proposta — auditoria de temporizadores (11/11/2026)
+
+| ID | Artefato | Revisão |
+|---|---|---|
+| MOD-TIME | `include/ModulockTimingPolicy.h`, `src/main.cpp` | Expiração por delta uint32 e flags para relé/LEDs |
+| MOD-PRIV | `src/main.cpp` | Remove RA, nome e UID do log serial de cadastro |
+| MOD-HOST | `test/security_policy_test.cpp` | Testes de wrap, limite temporal, inativo e duração inválida |
+| MOD-WIRE | `test/test_timing_privacy_wiring.py` | Guarda de regressão do uso das regras e não impressão de dados |
+| MOD-CI | `.github/workflows/security-ci.yml` | G++ host, Python de wiring e PlatformIO |
+| MOD-DOC | `docs/projeto/RELE_TEMPORIZACAO.md` e UML #05 | Riscos, estados, diagnóstico, HIL pendente |
+
+Branch `fix/timing-rollover-and-serial-privacy-20261111`, empilhada sobre o PR #3. Código e diagrama propõem correção de software **sem homologação elétrica nem autorização de flash**. Não liberar antes de ensaio HIL e revisão de sincronização entre tarefas, rede HTTP, sessões/CSRF e segurança dos cartões.

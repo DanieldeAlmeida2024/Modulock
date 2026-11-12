@@ -53,3 +53,18 @@ Os 18 casos anteriores continuam planejados. Os testes C++ isolam **política**,
 ### Resultado da automação da revisão
 
 [Workflow #43089433513](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43089433513) **aprovado**: política C++11 (`g++`) e ligação de handlers (Python) aprovadas; compilação ESP32 com PlatformIO aprovada. MOD-T19–T23 continuam exigindo validação de HTTP/RFID real e MOD-T26 comprova apenas build, não operação elétrica.
+
+## MOD-TIME v2.1.0 — testes de overflow e privacidade serial (proposta)
+
+| ID | Teste | Evidência e critério |
+|---|---|---|
+| MOD-T27 | Relé 1.000 ms, antes do limite/limite exato | `test/security_policy_test.cpp`, delta 999ms = ativo, 1000ms = expirado |
+| MOD-T28 | Transbordamento `millis()` uint32 | Antes e depois do wrap de `0xFFFFFFFE`, saída desliga no limite correto |
+| MOD-T29 | LEDs de 2.000 ms, duração inválida | Mesma política, encerramento defensivo para zero/limite não seguro |
+| MOD-T30 | Saída inativa e timestamp zero | Nenhum timer dispara quando inativo; zero é timestamp válido |
+| MOD-T31 | Ligação do firmware com o helper | `test/test_timing_privacy_wiring.py` verifica as três saídas e ausência de comparação absoluta antiga |
+| MOD-T32 | Logs de cadastro sem RA/nome/UID | Inspeção estática em `addUser()`, sem afirmar auditoria de toda serial |
+| MOD-T33 | Firmware completo compila `esp32dev` | CI PlatformIO, sem flash |
+| MOD-T34 | Relé e LEDs com placa real, brownout, watchdog e overflow | **Pendente HIL**, ensaio sem fechadura energizada |
+
+O workflow `.github/workflows/security-ci.yml` executa g++ host, duas inspeções Python e compilação ESP32. Testes estáticos **não provam** 1.000 ms de pulso físico, nem ausência de race condition em callbacks assíncronos. Registrar SHA e URL de run exatos após o CI.

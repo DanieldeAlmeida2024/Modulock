@@ -8,3 +8,5 @@
 - [Nova sequência: leitura e cadastro RFID protegido](04_sequencia_registro_uid.puml)
 
 Os diagramas descrevem o código fonte e a pinagem. Eles não demonstram que o mecanismo é resistente a ataques físicos ou Bluetooth.
+
+- [Relé/LEDs e overflow de millis()](05_temporizadores_rele_wrap.puml) — MOD-TIME v2.1.0 proposta, testes HIL pendentes.
