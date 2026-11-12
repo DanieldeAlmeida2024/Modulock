@@ -16,7 +16,7 @@ class SessionWiring(unittest.TestCase):
     def test_no_boot_shared_cookie(self):
         self.assertNotIn("identificadorSessao", fw)
         self.assertIn("adminSession.issue(", body("handleLogin"))
-        self.assertIn("mbedtls_sha256_ret(", fw)
+        self.assertIn("mbedtls_sha256(", fw)
         self.assertIn("xSemaphoreCreateMutex()", fw)
         self.assertIn("adminSession.expire(now)", fw)
     def test_logout_revokes_server_session(self):
