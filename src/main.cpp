@@ -2,6 +2,7 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include "ModulockAccessPolicy.h"
+#include "ModulockTimingPolicy.h"
 #include <SPI.h>
 #include <MFRC522.h>
 #include <ArduinoJson.h>
@@ -40,9 +41,12 @@ DynamicJsonDocument usersDoc(8192);
 
 String lastScannedUidForRegistration = "";
 unsigned long lastUidScanTime = 0;
-unsigned long relayOffTime = 0; 
-unsigned long greenLedOffTime = 0; 
-unsigned long redLedOffTime = 0;  
+uint32_t relayActivatedAtMs = 0;
+uint32_t greenLedActivatedAtMs = 0;
+uint32_t redLedActivatedAtMs = 0;
+bool relayActive = false;
+bool greenLedActive = false;
+bool redLedActive = false;
 
 void loadUsers();
 void saveUsers();
@@ -130,12 +134,8 @@ bool addUser(const String& ra, const String& name, const String& uid) {
     return false;
   }
 
-  Serial.print("Tentando adicionar usuário: RA=");
-  Serial.print(ra);
-  Serial.print(", Nome=");
-  Serial.print(name);
-  Serial.print(", UID=");
-  Serial.println(uid);
+  // Não imprimir RA, nome ou UID na serial: são dados identificáveis e credenciais clonáveis.
+  Serial.println("Solicitação de cadastro RFID recebida.");
 
   JsonArray usersArray = usersDoc["users"].as<JsonArray>();
   if (!usersArray) {
@@ -234,18 +234,25 @@ String findUserByRa(const String& ra) {
 
 
 void ativarRelePorta() {
+  // Reativação renova o intervalo; o timestamp zero é válido após wrap.
+  relayActivatedAtMs = static_cast<uint32_t>(millis());
+  relayActive = true;
   digitalWrite(pinRele, LOW);
-  relayOffTime = millis() + DOOR_OPEN_DURATION_MS;
   Serial.println("Relé acionado.");
 }
 
 void flashLED(int pin) {
-  digitalWrite(pin, HIGH);
+  const uint32_t now = static_cast<uint32_t>(millis());
   if (pin == ledVerde) {
-    greenLedOffTime = millis() + LED_FLASH_DURATION_MS;
+    greenLedActivatedAtMs = now;
+    greenLedActive = true;
   } else if (pin == ledVermelho) {
-    redLedOffTime = millis() + LED_FLASH_DURATION_MS;
+    redLedActivatedAtMs = now;
+    redLedActive = true;
+  } else {
+    return;
   }
+  digitalWrite(pin, HIGH);
 }
 
 
@@ -733,17 +740,21 @@ void setup() {
 
 void loop() {
   if (!servidorHabilitado) { delay(1000); return; }
-  if (relayOffTime != 0 && millis() >= relayOffTime) {
-    digitalWrite(pinRele, HIGH);
-    relayOffTime = 0;
+  const uint32_t now = static_cast<uint32_t>(millis());
+  if (modulockTimedActionExpired(relayActive, now, relayActivatedAtMs,
+                                static_cast<uint32_t>(DOOR_OPEN_DURATION_MS))) {
+    digitalWrite(pinRele, HIGH); // HIGH = relé desenergizado
+    relayActive = false;
   }
-  if (greenLedOffTime != 0 && millis() >= greenLedOffTime) {
+  if (modulockTimedActionExpired(greenLedActive, now, greenLedActivatedAtMs,
+                                static_cast<uint32_t>(LED_FLASH_DURATION_MS))) {
     digitalWrite(ledVerde, LOW);
-    greenLedOffTime = 0;
+    greenLedActive = false;
   }
-  if (redLedOffTime != 0 && millis() >= redLedOffTime) {
+  if (modulockTimedActionExpired(redLedActive, now, redLedActivatedAtMs,
+                                static_cast<uint32_t>(LED_FLASH_DURATION_MS))) {
     digitalWrite(ledVermelho, LOW);
-    redLedOffTime = 0;
+    redLedActive = false;
   }
 
   if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {

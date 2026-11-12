@@ -2,9 +2,9 @@ name: Modulock - verificações de firmware e segurança
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, fix/p0-uid-exposure-and-registration-20261111]
   push:
-    branches: [main]
+    branches: [main, fix/timing-rollover-and-serial-privacy-20261111]
 
 permissions:
   contents: read
@@ -20,7 +20,9 @@ jobs:
           g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/security_policy_test.cpp -o /tmp/modulock_security_test
           /tmp/modulock_security_test
       - name: Verificar ligação das rotas autenticadas
-        run: python3 test/test_security_wiring.py
+        run: |
+          python3 test/test_security_wiring.py
+          python3 test/test_timing_privacy_wiring.py
 
   firmware:
     name: Compilar firmware ESP32
