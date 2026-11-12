@@ -41,3 +41,7 @@ Para uma implantação real é obrigatório **redesenhar o canal de administraç
 
 ## Rastreabilidade
 [Plano MOD-LOGIN](../testes/LOGIN_RATE_LIMIT.md) · [UML de autenticação](../uml/07_login_lockout_lab_gate.puml) · [Versionamento](../controle/VERSIONAMENTO.md).
+
+## Verificação de compilação e limites da evidência
+
+[CI #43215252905](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43215252905) e [#43215357873](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43215357873) aprovaram C++ host/inspeções Python e builds `esp32dev` e `esp32dev-insecure-lab` no commit `87eb10eb56d204271c35a1b3c812d18c643c7570`. Isso não resolve transporte HTTP inseguro e nem demonstra segurança física; usar apenas como evidência de software. **Sem deploy e sem flash.**

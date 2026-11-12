@@ -24,3 +24,7 @@
 Comandos: `g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/login_throttle_test.cpp -o /tmp/modulock_login_throttle_test && /tmp/modulock_login_throttle_test`, `python3 test/test_login_throttle_wiring.py`, `pio run -e esp32dev`, `pio run -e esp32dev-insecure-lab`.
 
 **Observação:** a macro `MODULOCK_ALLOW_INSECURE_HTTP_LAB` habilita deliberadamente um serviço HTTP **não seguro** apenas no build de laboratório. Testes host e builds do firmware não certificam resistência de segurança de produção nem acessibilidade da fechadura.
+
+### Execução de software confirmada
+
+[Workflow #43215252905](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43215252905) e [#43215357873](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43215357873) **PASS** sobre `87eb10eb56d204271c35a1b3c812d18c643c7570`, incluindo políticas C++, verificação Python e os dois builds PlatformIO. **MOD-L13..L16 permanecem pendentes**: HIL, DoS e rede/TLS real não foram validados. Registrar novamente o SHA final do PR depois desta atualização documental.

@@ -71,3 +71,12 @@ Build e testes devem ser verificados no commit final. Ainda há HTTP sem TLS, UI
 | `docs/projeto/LOGIN_RATE_LIMIT_E_HTTP.md`, `docs/testes/LOGIN_RATE_LIMIT.md`, `docs/uml/07_login_lockout_lab_gate.puml` | Projeto, matriz de testes e diagrama próprios |
 
 **Sem release.** HTTP não foi substituído por HTTPS; modo laboratório é deliberadamente inseguro. A sessão ainda é única, o UID permanece clonável, login global pode sofrer lockout abusivo e HIL não ocorreu. Dependência empilhada sobre PR #6. A execução de CI no SHA final deve ser registrada antes de qualquer merge. Nenhuma gravação física.
+
+## Evidência CI verificável — MOD-LOGIN v2.3.0 (12/11/2026)
+
+**Head de código/documentação validado:** `87eb10eb56d204271c35a1b3c812d18c643c7570`.
+
+- [Actions #43215252905](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43215252905): **SUCCESS**, job `Guardas UID - C++ host` (g++ C++11, política UID/temporização, política/login throttle, Python wiring) e job `Compilar firmware ESP32` (PlatformIO `esp32dev` **e** `esp32dev-insecure-lab`).
+- [Actions #43215357873](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43215357873): **SUCCESS**, mesmas verificações no mesmo head.
+- O workflow de compilação **não gravou firmware** e não usou hardware. Não cobre a segurança do canal HTTP do laboratório, TLS, DoS real, consumo elétrico nem confiabilidade da fechadura.
+- Este parágrafo é uma **revisão documental** sobre o head validado; o commit documental subsequente precisa ter seu próprio CI verificado para permitir promoção.
