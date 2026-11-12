@@ -27,3 +27,5 @@ O firmware anterior gerava um identificador de sessão no boot, reutilizado por 
 Não fazer flash em controle físico. Ensaiar em bancada sem fechadura: validar 401/403, novo login derrubando cookie anterior, logout, revogação, CSRF ausente, TTL/overflow, reset e comandos simultâneos. Depois projetar transporte TLS e atributos de cookie Secure com revisão de hardware, rate limiting e anticlone RFID.
 
 [Matriz de testes](../testes/SESSAO_CSRF.md) · [UML](../uml/06_sessao_revogacao_csrf.puml) · [Histórico](../controle/VERSIONAMENTO.md).
+
+**Evidência de software:** [CI #43140037802](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43140037802) — testes C++/Python e build ESP32 aprovados no commit `62a1723266000d03b61e7bf5d78326a41a912cb8`. Revalidação de código após esse SHA é obrigatória; HIL/TLS permanecem não executados.
