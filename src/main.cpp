@@ -522,16 +522,23 @@ void handleDashboard(AsyncWebServerRequest *request) {
         </div>
       </div>
       <script>
+        async function csrfHeaders() {
+          const response = await fetch('/session/csrf', { cache: 'no-store' });
+          if (!response.ok) throw new Error('Sessão encerrada');
+          const { csrfToken } = await response.json();
+          return { 'X-Modulock-CSRF': csrfToken };
+        }
         function openDoor() {
-          fetch('/openDoor', { method: 'POST' })
+          csrfHeaders().then(headers => fetch('/openDoor', { method: 'POST', headers }))
             .then(response => response.text())
             .then(data => alert(data))
             .catch(error => console.error('Error:', error));
         }
 
         function logout() {
-            document.cookie = "session_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"; // Expira o cookie
-            window.location.href = "/"; 
+          csrfHeaders()
+            .then(headers => fetch('/logout', { method: 'POST', headers }))
+            .finally(() => { window.location.href = '/'; });
         }
 
         function loadUsers() {
@@ -562,13 +569,11 @@ void handleDashboard(AsyncWebServerRequest *request) {
           if (confirm('Are you sure you want to remove user with RA: ' + ra + '?')) {
             const formData = new URLSearchParams();
             formData.append('ra', ra);
-            fetch('/removeUser', {
+            csrfHeaders().then(headers => fetch('/removeUser', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-              },
+              headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
               body: formData
-            })
+            }))
             .then(response => response.text())
             .then(data => {
               alert(data);
@@ -668,6 +673,12 @@ void handlePaginaRegistro(AsyncWebServerRequest *request) {
 
         setInterval(fetchLastScannedUid, 1000);
 
+        async function csrfHeaders() {
+          const response = await fetch('/session/csrf', { cache: 'no-store' });
+          if (!response.ok) throw new Error('Sessão encerrada');
+          const { csrfToken } = await response.json();
+          return { 'X-Modulock-CSRF': csrfToken };
+        }
         function registerUser() {
           const ra = document.getElementById('raInput').value;
           const name = document.getElementById('nameInput').value;
@@ -685,13 +696,11 @@ void handlePaginaRegistro(AsyncWebServerRequest *request) {
           formData.append('name', name);
           formData.append('uid', uid);
 
-          fetch('/registerUser', {
+          csrfHeaders().then(headers => fetch('/registerUser', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
+            headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData
-          })
+          }))
           .then(response => response.text())
           .then(data => {
             messageElement.innerText = data;
