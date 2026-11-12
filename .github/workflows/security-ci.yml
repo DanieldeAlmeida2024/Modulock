@@ -2,9 +2,9 @@ name: Modulock - verificações de firmware e segurança
 
 on:
   pull_request:
-    branches: [main, fix/p0-uid-exposure-and-registration-20261111, fix/timing-rollover-and-serial-privacy-20261111]
+    branches: [main, fix/p0-uid-exposure-and-registration-20261111, fix/timing-rollover-and-serial-privacy-20261111, fix/admin-session-revocation-csrf-20261111]
   push:
-    branches: [main, fix/timing-rollover-and-serial-privacy-20261111, fix/admin-session-revocation-csrf-20261111]
+    branches: [main, fix/admin-session-revocation-csrf-20261111, fix/login-throttle-insecure-http-gate-20261112]
 
 permissions:
   contents: read
@@ -26,6 +26,9 @@ jobs:
           python3 test/test_session_wiring.py
           g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/session_policy_test.cpp -o /tmp/modulock_session_test
           /tmp/modulock_session_test
+          g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/login_throttle_test.cpp -o /tmp/modulock_login_throttle_test
+          /tmp/modulock_login_throttle_test
+          python3 test/test_login_throttle_wiring.py
 
   firmware:
     name: Compilar firmware ESP32
