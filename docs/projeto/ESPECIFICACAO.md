@@ -59,3 +59,7 @@ Firmware Arduino para ESP32 que aciona relé físico a partir de cartão RFID ou
 ## MOD-TIME v2.1.0 — temporizadores do relé/LEDs e privacidade serial (proposta)
 
 O código anterior aplicava deadline absoluto `millis() + duração` e comparava `millis() >= deadline`. Em overflow de uint32, a janela do relé/LEDs podia terminar cedo. A revisão usa `ModulockTimingPolicy.h` com delta modular uint32 e flags de atividade; GPIO4 permanece LOW durante a janela e volta a HIGH no término, conforme polaridade programada. Também remove impressão de RA/nome/UID no log serial durante tentativa de cadastro. [Especificação e riscos](RELE_TEMPORIZACAO.md). **Não validar segurança física sem HIL**, especialmente sincronização entre callbacks assíncronos, carga elétrica, perda de energia e autenticação de usuários.
+
+## MOD-SESSION v2.2.0 — login revogável e CSRF (proposta)
+
+Cada login agora gera cookie aleatório próprio; novo login revoga anterior, logout é servido por POST com revogação no ESP32 e mutações administrativas exigem CSRF. Política de 10 min por inatividade e 30 min absoluta com relógio modular. [Contrato](SESSOES_OPERADOR.md). HTTPS, rate limits, CSRF integrado a rede real e RFID anti-clone continuam pendentes.

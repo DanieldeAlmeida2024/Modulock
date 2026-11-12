@@ -27,3 +27,7 @@ O UID de cartão RFID é um identificador de credencial; divulgá-lo pode facili
 ## Execução da verificação de código e firmware
 
 **CI aprovado em 11/11/2026:** [run #43089433513](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43089433513), incluindo teste host de TTL, overflow, UID idêntico e falha de autorização, inspeção de ligação das rotas e compilação PlatformIO do ESP32. **HIL, rede real, cookies e hardware de relé não testados**. O resultado não certifica a fechadura.
+
+### Atualização v2.2.0 proposta
+
+A descrição de cookie único no boot refere-se à versão anterior. A proposta atual renova a sessão em todo login, invalida sessões anteriores e revoga no logout. HTTP sem TLS e falta de rate limit seguem bloqueios. [Contrato atual](SESSOES_OPERADOR.md).

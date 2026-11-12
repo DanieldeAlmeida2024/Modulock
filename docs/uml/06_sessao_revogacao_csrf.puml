@@ -1,0 +1,36 @@
+@startuml
+title Modulock — sessão por login, CSRF e logout real (v2.2.0 proposta)
+actor Operador
+participant Navegador
+participant ESP32
+participant "ModulockAdminSession" as Sessao
+participant "Relé / SPIFFS" as Dados
+Operador -> Navegador : Credenciais administrativas
+Navegador -> ESP32 : POST /login
+ESP32 -> ESP32 : esp_fill_random() token + CSRF\nSHA-256(token)
+ESP32 -> Sessao : issue(hash, csrf, now) protegido por mutex
+Sessao --> ESP32 : Login anterior revogado
+ESP32 --> Navegador : Set-Cookie HttpOnly; SameSite=Strict
+Navegador -> ESP32 : GET /session/csrf com cookie
+ESP32 -> Sessao : csrfFor(hash, now)
+Sessao --> ESP32 : nonce CSRF
+ESP32 --> Navegador : JSON token (no-store)
+Operador -> Navegador : Abrir porta / cadastrar / remover
+Navegador -> ESP32 : POST com cookie + X-Modulock-CSRF
+ESP32 -> Sessao : valid() + mutationAllowed()
+alt inválido
+  ESP32 --> Navegador : 401 / 403
+else válido
+  ESP32 -> Dados : efeito autorizado
+  ESP32 --> Navegador : 200
+end
+Operador -> Navegador : Logout
+Navegador -> ESP32 : POST /logout com cookie + CSRF
+ESP32 -> Sessao : revoke()
+Sessao --> ESP32 : clear()
+ESP32 --> Navegador : 204; cookie Max-Age=0
+note over ESP32,Dados
+HTTP porta 80 e RFID UID não criptográfico.
+Exige TLS, HIL e limites de taxa antes de produção.
+end note
+@enduml
