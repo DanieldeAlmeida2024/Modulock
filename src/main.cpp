@@ -4,6 +4,7 @@
 #include "ModulockAccessPolicy.h"
 #include "ModulockTimingPolicy.h"
 #include "ModulockSessionPolicy.h"
+#include "ModulockLoginThrottle.h"
 #include <mbedtls/sha256.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -33,6 +34,7 @@ const char* WIFI_SSID = MODULOCK_WIFI_SSID;
 const char* WIFI_PASSWORD = MODULOCK_WIFI_PASSWORD;
 
 ModulockAdminSession adminSession;
+ModulockLoginThrottle adminLoginThrottle;
 SemaphoreHandle_t adminSessionMutex = nullptr;
 bool servidorHabilitado = false;
 
@@ -441,44 +443,59 @@ void handleRoot(AsyncWebServerRequest *request) {
 }
 
 void handleLogin(AsyncWebServerRequest *request) {
-
-  if (request->hasParam("username", true) && request->hasParam("password", true)) {
-    String username = request->getParam("username", true)->value();
-    String password = request->getParam("password", true)->value();
-
-    if (username == WEB_USERNAME && password == WEB_PASSWORD) {
-      String token = modulockRandomHex();
-      String csrf = modulockRandomHex();
-      uint8_t digest[32] = {0};
-      if (!adminSessionMutex ||
-          mbedtls_sha256(reinterpret_cast<const unsigned char*>(token.c_str()),
-                             token.length(), digest, 0) != 0 ||
-          xSemaphoreTake(adminSessionMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
-        request->send(503, "text/plain", "Não foi possível criar sessão.");
-        return;
-      }
-      const bool issued = adminSession.issue(
-          digest, csrf.c_str(), static_cast<uint32_t>(millis()));
-      xSemaphoreGive(adminSessionMutex);
-      memset(digest, 0, sizeof(digest));
-      csrf = "";
-      if (!issued) {
-        request->send(503, "text/plain", "Não foi possível criar sessão.");
-        return;
-      }
-      AsyncWebServerResponse *response = request->beginResponse(302, "text/plain", "");
-      response->addHeader("Set-Cookie",
-          "session_id=" + token + "; Path=/; HttpOnly; SameSite=Strict");
-      response->addHeader("Cache-Control", "no-store");
-      response->addHeader("Location", "/dashboard");
-      request->send(response);
-
-    } else {
-      request->redirect("/?error=1");
-    }
-  } else {
-    request->redirect("/?error=1");
+  // A contagem global é serializada com o estado de sessão. IP/client headers
+  // não são confiáveis como identidade (X-Forwarded-For é controlável por cliente).
+  if (!adminSessionMutex || xSemaphoreTake(adminSessionMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+    request->send(503, "text/plain", "Autenticação indisponível.");
+    return;
   }
+  const uint32_t now = static_cast<uint32_t>(millis());
+  if (!adminLoginThrottle.allowAttempt(now)) {
+    const uint32_t retrySeconds = adminLoginThrottle.retryAfterSeconds(now);
+    xSemaphoreGive(adminSessionMutex);
+    AsyncWebServerResponse* response = request->beginResponse(
+        429, "text/plain", "Muitas tentativas. Aguarde para tentar novamente.");
+    response->addHeader("Retry-After", String(retrySeconds));
+    response->addHeader("Cache-Control", "no-store");
+    request->send(response);
+    return;
+  }
+
+  bool credentialsValid = false;
+  if (request->hasParam("username", true) && request->hasParam("password", true)) {
+    const String username = request->getParam("username", true)->value();
+    const String password = request->getParam("password", true)->value();
+    credentialsValid = username.length() <= 128 && password.length() <= 128 &&
+                       username == WEB_USERNAME && password == WEB_PASSWORD;
+  }
+  if (!credentialsValid) {
+    adminLoginThrottle.failed(now);
+    xSemaphoreGive(adminSessionMutex);
+    request->redirect("/?error=1");
+    return;
+  }
+
+  String token = modulockRandomHex();
+  String csrf = modulockRandomHex();
+  uint8_t digest[32] = {0};
+  const bool hashOk = mbedtls_sha256(
+      reinterpret_cast<const unsigned char*>(token.c_str()),
+      token.length(), digest, 0) == 0;
+  const bool issued = hashOk && adminSession.issue(digest, csrf.c_str(), now);
+  if (issued) adminLoginThrottle.succeeded();
+  xSemaphoreGive(adminSessionMutex);
+  memset(digest, 0, sizeof(digest));
+  csrf = "";
+  if (!issued) {
+    request->send(503, "text/plain", "Não foi possível criar sessão.");
+    return;
+  }
+  AsyncWebServerResponse* response = request->beginResponse(302, "text/plain", "");
+  response->addHeader("Set-Cookie",
+      "session_id=" + token + "; Path=/; HttpOnly; SameSite=Strict");
+  response->addHeader("Cache-Control", "no-store");
+  response->addHeader("Location", "/dashboard");
+  request->send(response);
 }
 
 void handleDashboard(AsyncWebServerRequest *request) {
@@ -848,6 +865,12 @@ void setup() {
     Serial.println("Configure include/ModulockSecrets.h com credenciais locais seguras.");
     return;
   }
+  // Um build padrão NÃO expõe login/UIDs/relé administrativo via HTTP aberto.
+  // Laboratório isolado: habilite explicitamente -DMODULOCK_ALLOW_INSECURE_HTTP_LAB=1.
+#if !defined(MODULOCK_ALLOW_INSECURE_HTTP_LAB) || (MODULOCK_ALLOW_INSECURE_HTTP_LAB != 1)
+  Serial.println("Administração HTTP desativada: falta HTTPS autenticado.");
+  return; // loop() mantém saídas desligadas se servidorHabilitado=false.
+#endif
   adminSessionMutex = xSemaphoreCreateMutex();
   if (!adminSessionMutex) {
     Serial.println("Falha ao iniciar controle de sessão; servidor não iniciado.");
