@@ -33,3 +33,7 @@ Alteração de segurança em **revisão**. Compilação PlatformIO e testes de p
 - [Controle de versão](docs/controle/VERSIONAMENTO.md)
 
 > Hardware físico: não considerar a implementação pronta para uma porta real sem testes de autenticação, Bluetooth e falha segura.
+
+## Segurança da temporização física — proposta MOD-TIME v2.1.0
+
+As saídas do relé e dos dois LEDs usam tempo modular uint32, evitando comparações de deadline absoluto após overflow de `millis()`. Foi removido também o log serial de RA/nome/UID durante cadastro. Há testes C++ host, verificações estáticas e build PlatformIO no CI, mas **nenhum hardware foi conectado/testado**. Não instalar em fechadura real sem ensaio de bancada, TLS/CSRF, avaliação de clonagem RFID e revisão das condições de corrida. [Especificação](docs/projeto/RELE_TEMPORIZACAO.md), [testes](docs/testes/PLANO_DE_TESTES.md), [UML](docs/uml/05_temporizadores_rele_wrap.puml), [versões](docs/controle/VERSIONAMENTO.md).
