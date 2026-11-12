@@ -30,8 +30,9 @@ int main() {
   assert(!store.valid(a,1001+MODULOCK_SESSION_ABSOLUTE_MS));
   assert(store.issue(a,csrf,0xFFFFFFF0u));
   assert(store.valid(a,4));
-  store.expire(static_cast<uint32_t>(0xFFFFFFF0u+MODULOCK_SESSION_IDLE_MS));
-  assert(!store.valid(a,static_cast<uint32_t>(0xFFFFFFF0u+MODULOCK_SESSION_IDLE_MS)));
+  // A chamada valid(a,4) atualizou lastSeenAt_ após o wrap.
+  store.expire(static_cast<uint32_t>(4u+MODULOCK_SESSION_IDLE_MS));
+  assert(!store.valid(a,static_cast<uint32_t>(4u+MODULOCK_SESSION_IDLE_MS)));
   assert(!modulockCsrfEqual(csrf,"short"));
   assert(!modulockDigestEqual(a,b));
   std::cout<<"PASS: rotating session, logout, CSRF, TTL and uint32 wrap\n";

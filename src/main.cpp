@@ -310,7 +310,7 @@ String modulockCookieToken(AsyncWebServerRequest* request) {
 bool modulockCookieDigest(AsyncWebServerRequest* request, uint8_t digest[32]) {
   const String cookie = modulockCookieToken(request);
   if (cookie.length() != 64) return false;
-  return mbedtls_sha256_ret(
+  return mbedtls_sha256(
       reinterpret_cast<const unsigned char*>(cookie.c_str()),
       cookie.length(), digest, 0) == 0;
 }
@@ -451,7 +451,7 @@ void handleLogin(AsyncWebServerRequest *request) {
       String csrf = modulockRandomHex();
       uint8_t digest[32] = {0};
       if (!adminSessionMutex ||
-          mbedtls_sha256_ret(reinterpret_cast<const unsigned char*>(token.c_str()),
+          mbedtls_sha256(reinterpret_cast<const unsigned char*>(token.c_str()),
                              token.length(), digest, 0) != 0 ||
           xSemaphoreTake(adminSessionMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
         request->send(503, "text/plain", "Não foi possível criar sessão.");
