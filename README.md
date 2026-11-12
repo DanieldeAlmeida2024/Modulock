@@ -41,3 +41,7 @@ As saídas do relé e dos dois LEDs usam tempo modular uint32, evitando compara�
 ## Sessão administrativa — MOD-SESSION v2.2.0 (proposta)
 
 Login cria um cookie novo de 256 bits, com SHA-256 do token na RAM do ESP32 e apenas uma sessão de operador por vez. Idle 10 min, expiração absoluta 30 min, logout via POST com revogação do lado do servidor, CSRF obrigatório para abrir porta e mudar cadastros. **HTTP porta 80 permanece sem TLS e não pode ser usado em produção.** [Especificação](docs/projeto/SESSOES_OPERADOR.md) · [Testes](docs/testes/SESSAO_CSRF.md) · [UML](docs/uml/06_sessao_revogacao_csrf.puml).
+
+## Limite de login e administração HTTP desativada por padrão (MOD-LOGIN v2.3.0 proposta)
+
+`POST /login` recebe throttling global: no mínimo 2 s entre tentativas; após cinco falhas em até 60 s, bloqueio por 300 s (HTTP 429 + Retry-After). O build padrão `esp32dev` **não inicia Wi-Fi nem servidor web e mantém o processamento RFID/relé inativo** para impedir administração em HTTP aberto. Há perfil `esp32dev-insecure-lab`, habilitado exclusivamente para bancada isolada e sem fechadura, que libera intencionalmente o servidor HTTP para testes. **Isto não implementa TLS e não libera produção.** Consulte [projeto](docs/projeto/LOGIN_RATE_LIMIT_E_HTTP.md), [testes](docs/testes/LOGIN_RATE_LIMIT.md), [UML](docs/uml/07_login_lockout_lab_gate.puml) e [versionamento](docs/controle/VERSIONAMENTO.md).

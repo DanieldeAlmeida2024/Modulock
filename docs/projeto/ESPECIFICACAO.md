@@ -63,3 +63,7 @@ O código anterior aplicava deadline absoluto `millis() + duração` e comparava
 ## MOD-SESSION v2.2.0 — login revogável e CSRF (proposta)
 
 Cada login agora gera cookie aleatório próprio; novo login revoga anterior, logout é servido por POST com revogação no ESP32 e mutações administrativas exigem CSRF. Política de 10 min por inatividade e 30 min absoluta com relógio modular. [Contrato](SESSOES_OPERADOR.md). HTTPS, rate limits, CSRF integrado a rede real e RFID anti-clone continuam pendentes.
+
+## MOD-LOGIN v2.3.0 — bloqueio de tentativas e gate de transporte
+
+Novo helper `ModulockLoginThrottle.h`: 5 erros/60 segundos causam bloqueio de 5 minutos; até uma tentativa a cada 2 segundos e HTTP 429 durante limitação. A validação é global no dispositivo e atômica sob `adminSessionMutex`, evitando confiar em IP/headers do cliente como identidade. `setup()` bloqueia Wi-Fi/HTTP por padrão, a menos que a compilação explicite `MODULOCK_ALLOW_INSECURE_HTTP_LAB=1`, reservado a rede de bancada isolada. O `loop()` atual mantém RFID/relé inativos nesse modo padrão: **alteração operacional intencional para não instalar firmware inseguro**. HTTPS fim a fim continua faltante. [Especificação de segurança própria](LOGIN_RATE_LIMIT_E_HTTP.md).

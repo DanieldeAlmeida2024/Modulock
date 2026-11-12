@@ -12,3 +12,5 @@ Os diagramas descrevem o código fonte e a pinagem. Eles não demonstram que o m
 - [Relé/LEDs e overflow de millis()](05_temporizadores_rele_wrap.puml) — MOD-TIME v2.1.0 proposta, testes HIL pendentes.
 
 - [Sessão, CSRF e logout no servidor](06_sessao_revogacao_csrf.puml) — v2.2.0 proposta, HIL pendente.
+
+- [Bloqueio do login e modo HTTP de laboratório](07_login_lockout_lab_gate.puml) — v2.3.0 proposta, default sem servidor nem RFID.

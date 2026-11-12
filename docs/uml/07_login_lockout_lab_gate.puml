@@ -1,0 +1,38 @@
+@startuml
+title Modulock MOD-LOGIN 2.3.0 — limite global e gate de laboratório
+start
+:Boot ESP32 / GPIOs em estado desenergizado;
+if (MODULOCK_ALLOW_INSECURE_HTTP_LAB == 1?) then (não)
+  :Não iniciar Wi-Fi nem AsyncWebServer;
+  :servidorHabilitado=false;
+  :loop não processa RFID ou relé;
+  stop
+else (sim, bancada isolada)
+  :Conectar Wi-Fi de laboratório;
+  :Iniciar servidor HTTP porta 80;
+endif
+:Receber POST /login;
+:Tomar adminSessionMutex;
+if (Bloqueado ou < 2 s desde última tentativa?) then (sim)
+  :Libera mutex;
+  :HTTP 429 + Retry-After + no-store;
+  stop
+else (não)
+  :Registrar tentativa no relógio modular;
+endif
+if (Credenciais válidas?) then (não)
+  :Registrar falha (até 5 em 60 s);
+  if (5 falhas?) then (sim)
+    :Bloquear 300 s;
+  endif
+  :Liberar mutex;
+  :Login negado;
+  stop
+else (sim)
+  :Emitir sessão 256 bits / CSRF;
+  :Limpar histórico de tentativas;
+  :Liberar mutex;
+  :Set-Cookie HttpOnly;
+  stop
+endif
+@enduml

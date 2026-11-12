@@ -58,3 +58,16 @@ Build e testes devem ser verificados no commit final. Ainda há HTTP sem TLS, UI
 - O primeiro run da implementação [#43139270800](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43139270800) foi **FAIL**, revelando API `mbedtls_sha256_ret` ausente em mbedTLS 3 e um oráculo incorreto do teste de inatividade após `valid()` atualizar `lastSeenAt`. Corrigidos; os runs seguintes expuseram e corrigiram um marcador obsoleto no teste de wiring.
 - Esses gates **não** abrangem HIL, HTTPS/TLS, prevenção de brute-force, ataques de rede, sincronização de GPIO/SPIFFS com revogação ou resistência de RFID à clonagem. Não há firmware gravado, equipamento acionado nem release autorizado.
 - Este registro posterior é somente documental; verificar novamente os checks do novo HEAD antes de qualquer merge.
+
+## MOD-LOGIN v2.3.0 proposta — 12/11/2026
+
+| Artefato | Mudança e motivo |
+|---|---|
+| `include/ModulockLoginThrottle.h` | Política C++11 global: 5 falhas/60 s, cadência 2 s, lockout 300 s e rollover de `millis()` |
+| `src/main.cpp` | Mutex abrange checagem de limite, senha e emissão de sessão; 429/Retry-After; HTTP off por padrão em `setup` |
+| `platformio.ini` | Perfil inseguro `esp32dev-insecure-lab` explícito e isolado, opt-in para bancada |
+| `test/login_throttle_test.cpp`, `test/test_login_throttle_wiring.py` | Testes C++ e estáticos verificam limites e fail-closed |
+| `.github/workflows/security-ci.yml` | Executa verificações host e compila ambos os perfis sem flash |
+| `docs/projeto/LOGIN_RATE_LIMIT_E_HTTP.md`, `docs/testes/LOGIN_RATE_LIMIT.md`, `docs/uml/07_login_lockout_lab_gate.puml` | Projeto, matriz de testes e diagrama próprios |
+
+**Sem release.** HTTP não foi substituído por HTTPS; modo laboratório é deliberadamente inseguro. A sessão ainda é única, o UID permanece clonável, login global pode sofrer lockout abusivo e HIL não ocorreu. Dependência empilhada sobre PR #6. A execução de CI no SHA final deve ser registrada antes de qualquer merge. Nenhuma gravação física.

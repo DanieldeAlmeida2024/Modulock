@@ -72,3 +72,7 @@ O workflow `.github/workflows/security-ci.yml` executa g++ host, duas inspeçõe
 ## MOD-SESSION v2.2.0 proposta
 
 Casos MOD-S01..13 cobrindo login rotativo, CSRF, revogação, TTL e build; testes de rede real, hardware e TLS ainda pendentes. [Matriz própria](SESSAO_CSRF.md).
+
+## MOD-LOGIN v2.3.0 — testes de brute-force e configuração fail-closed
+
+Adicionados casos MOD-L01..16 com limite/cooldown, janela, rollover uint32, login rotativo, macro de laboratório e compilação dos dois perfis PlatformIO. A matriz específica é [LOGIN_RATE_LIMIT.md](LOGIN_RATE_LIMIT.md). **TLS, comportamento HTTP real, relay/HIL e segurança contra DoS permanecem pendentes**.

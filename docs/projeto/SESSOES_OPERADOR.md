@@ -29,3 +29,7 @@ Não fazer flash em controle físico. Ensaiar em bancada sem fechadura: validar 
 [Matriz de testes](../testes/SESSAO_CSRF.md) · [UML](../uml/06_sessao_revogacao_csrf.puml) · [Histórico](../controle/VERSIONAMENTO.md).
 
 **Evidência de software:** [CI #43140037802](https://github.com/DanieldeAlmeida2024/Modulock/actions/runs/43140037802) — testes C++/Python e build ESP32 aprovados no commit `62a1723266000d03b61e7bf5d78326a41a912cb8`. Revalidação de código após esse SHA é obrigatória; HIL/TLS permanecem não executados.
+
+### Atualização de segurança MOD-LOGIN v2.3.0 (proposta)
+
+A frase anterior sobre ausência de rate-limit descreve v2.2.0, não a proposta posterior. Na nova branch, cinco credenciais erradas em 60 s bloqueiam o login por 300 s e há cadência de 2 s. O HTTP administrativo permanece sem TLS, **mas o build padrão agora não o inicia**; apenas `esp32dev-insecure-lab` habilita essa superfície para rede isolada. Bloqueio global ainda admite DoS e reinício limpa a contagem. [Novo contrato](LOGIN_RATE_LIMIT_E_HTTP.md).
