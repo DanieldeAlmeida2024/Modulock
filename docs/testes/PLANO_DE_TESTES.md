@@ -33,3 +33,16 @@ Executar inicialmente **sem fechadura energizada**. Usar uma carga de teste adeq
 
 ## Automação disponível e pendências
 `platformio.ini` define o alvo `esp32dev`; não foi localizada suíte de firmware/HIL. Este documento especifica **casos a implementar**, não resultados PASS. A verificação física exige equipamento e registro de evidências. Como risco conhecido, o tratamento de Bluetooth deve ser revisado antes de considerar o sistema seguro.
+
+## Regressões de segurança e gates automatizados — 14/11/2026
+
+| Identificador | Contrato | Automação |
+| --- | --- | --- |
+| MOD-S01 | Interface HTTP administrativa desligada por padrão | `tests/test_security_defaults.py` |
+| MOD-S02 | Remoção de comandos Bluetooth que poderiam acionar o relé | `tests/test_security_defaults.py` |
+| MOD-S03 | Laço RFID independente do servidor web | `tests/test_security_defaults.py` |
+| MOD-S04 | Não formatar o SPIFFS ao falhar montagem | `tests/test_security_defaults.py` |
+| MOD-S05 | Credenciais reais ausentes do arquivo de exemplo | `tests/test_security_defaults.py` |
+| MOD-C01 | Compilar para `esp32dev` com PlatformIO | `.github/workflows/compile-esp32.yml` |
+
+**Separação de evidências:** testes estáticos apenas verificam padrões no código. A compilação prova que o alvo especificado é compilável, mas não que o comportamento elétrico, o fail-safe ou os tempos sejam corretos na placa. O acionamento do relé, RFID, falhas de energia e tentativas de ataque continuam bloqueados para uso real até teste HIL controlado.
