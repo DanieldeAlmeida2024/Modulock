@@ -38,3 +38,7 @@ ESP32, leitor RFID MFRC522, módulo relé, LEDs, fonte e conversor elétrico apr
 ## Documentação
 
 [Requisitos](docs/REQUISITOS.md) · [Arquitetura](docs/ARQUITETURA.md) · [Especificação do firmware](docs/projeto/ESPECIFICACAO.md) · [Diagramas](docs/uml/README.md) · [Testes e segurança](docs/testes/PLANO_DE_TESTES.md) · [Versionamento](docs/controle/VERSIONAMENTO.md).
+
+## Temporização do relé e LEDs — tolerante a overflow
+
+O relé (GPIO4) e os LEDs (GPIO13/14) usam diferenças modulares de `millis()` com flags explícitas de atividade. A correção evita que a comparação absoluta de prazo desligue cedo após o wrap do contador de 32 bits (~49,7 dias). Testes C++11 em host e build PlatformIO são automatizados; **não equivalem a ensaio HIL**, portanto não conectar a fechaduras reais antes de validar temporização, brownout, reset, sensores e falha segura no hardware.
