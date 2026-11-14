@@ -25,7 +25,7 @@ ESP32, MFRC522, módulo relé compatível, LEDs, fonte e conversor adequados ao 
 [Arquitetura](docs/ARQUITETURA.md) · [Requisitos](docs/REQUISITOS.md) · [UML](docs/UML.puml) · [Testes](docs/PLANO_TESTES.md) · [Instruções para IA](AGENTS.md).
 
 ## Status
-Alteração de segurança em **revisão**. Compilação PlatformIO e testes de ponta a ponta no ESP32 ainda obrigatórios. Não há garantia de uso seguro em ambientes reais.
+Alteração de segurança em **revisão**. Compilação PlatformIO via GitHub Actions aprovada; testes de bancada e de ponta a ponta no ESP32 ainda obrigatórios. Não há garantia de uso seguro em ambientes reais.
 
 ## Documentação técnica Modulock v1.0.0
 
@@ -38,4 +38,4 @@ Alteração de segurança em **revisão**. Compilação PlatformIO e testes de p
 
 ## Evidências da correção de segurança (13/11/2026)
 
-A branch `fix/auditoria-entrevista-20261113` inclui o teste estático `python -m unittest discover -s tests -v` e execução no GitHub Actions. Esse contrato comprova apenas os padrões de código presentes. **Ainda não foi executada compilação PlatformIO nem teste físico/HIL**, e a issue de segurança não deve ser encerrada até eliminar o risco de clonagem de RFID e implementar um canal administrativo seguro com sessão revogável e proteção CSRF.
+A branch `fix/auditoria-entrevista-20261113` inclui o teste estático `python -m unittest discover -s tests -v` e execução no GitHub Actions. Esse contrato comprova apenas os padrões de código presentes. **A compilação PlatformIO foi executada no GitHub Actions; teste físico/HIL ainda não foi executado**, e a issue de segurança não deve ser encerrada até eliminar o risco de clonagem de RFID e implementar um canal administrativo seguro com sessão revogável e proteção CSRF.
