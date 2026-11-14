@@ -1,0 +1,38 @@
+@startuml
+title Modulock — consulta/registro de UID autenticado (2.0.0 proposta)
+actor "Visitante" as Visitor
+actor "Administrador" as Admin
+participant "ESPAsyncWebServer" as HTTP
+participant "isAuthenticated()" as Auth
+participant "ModulockAccessPolicy" as Policy
+participant "RFID MFRC522" as RFID
+database "SPIFFS / users.json" as Store
+Visitor -> HTTP : GET /getLastScannedUid (sem sessão)
+HTTP -> Auth : validar cookie da sessão
+Auth --> HTTP : false
+HTTP --> Visitor : 401 (sem UID)
+RFID -> HTTP : cartão escaneado, último UID e horário
+Admin -> HTTP : GET /getLastScannedUid + sessão
+HTTP -> Auth : validar sessão
+Auth --> HTTP : true
+HTTP -> Policy : UID existe? millis - scanTime < 30s?
+Policy --> HTTP : válido / expirado
+HTTP --> Admin : UID recente ou "No UID" (no-store)
+Admin -> HTTP : POST /registerUser + RA/nome/UID
+HTTP -> Auth : validar sessão
+Auth --> HTTP : true
+HTTP -> Policy : UID informado == último UID recente?
+alt UID inválido/expirado
+ Policy --> HTTP : false
+ HTTP --> Admin : 409 sem cadastro
+else UID recente correspondente
+ HTTP -> Store : addUser() / saveUsers()
+ HTTP -> HTTP : limpar último UID após sucesso
+ HTTP --> Admin : 200 registro
+end
+note bottom
+Canal Bluetooth de comando removido.
+UID-only RFID ainda pode ser clonado.
+Sessões HTTP e hardware exigem revisão HIL.
+end note
+@enduml
