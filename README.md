@@ -1,35 +1,30 @@
-# Modulock — controle experimental de acesso RFID/NFC (ESP32)
+# Modulock — controle experimental de acesso RFID (ESP32)
 
-Firmware de laboratório para ESP32-WROOM-32, leitor MFRC522, relé e página web administrativa. **Não utilizar como fechadura de segurança real sem auditoria, criptografia de transporte e testes no dispositivo.**
+Firmware de bancada para estudo de controle físico de acesso com ESP32-WROOM-32, leitor MFRC522, relé, indicadores luminosos e interface de administração local.
 
 ## Hardware
-ESP32, MFRC522, módulo relé compatível, LEDs, fonte e conversor adequados ao projeto elétrico. Consulte o diagrama físico existente antes de energizar a montagem.
 
-## Configurar e compilar
-1. Instale PlatformIO e as dependências declaradas em `platformio.ini`.
+ESP32, leitor RFID MFRC522, módulo relé, LEDs, fonte e conversor elétrico apropriados. Conferir a ligação dos pinos, a alimentação e as condições do circuito antes de energizar o dispositivo.
+
+## Configuração
+
+1. Instale PlatformIO e consulte as dependências de `platformio.ini`.
 2. Copie `include/ModulockSecrets.example.h` para `include/ModulockSecrets.h`.
-3. Defina Wi-Fi e administrador localmente; não versionar esse arquivo. A senha administrativa deve ter **12 ou mais caracteres**.
-4. Compile com `pio run`; para gravar no hardware use `pio run -t upload` apenas após conferir circuito e pinos.
-5. Inicialize SPIFSS conforme particionamento do firmware e revise riscos de perda de dados.
+3. Configure Wi-Fi e credenciais locais; não versione o arquivo de segredos.
+4. Compile com `pio run`.
+5. Grave com `pio run -t upload` somente após conferir a montagem.
+6. Valide o armazenamento SPIFFS e os estados do relé em condições de erro.
 
-## Segurança
-- Antes havia senha/SSID fixos no código e um cookie web aceito sem validação do identificador. A correção proposta remove os valores fixos e usa sessão aleatória por inicialização.
-- O canal de comandos **Bluetooth foi desativado** porque permitia desbloqueio e alteração de usuários sem autenticação.
-- O painel usa HTTP sem TLS: restringir a rede de teste; não expor portas ao público.
-- **Rotacione imediatamente** quaisquer credenciais previamente publicadas; os valores continuam visíveis nos commits antigos até um saneamento do histórico.
-- UID de cartões RFID pode ser clonado dependendo do cartão/tecnologia: não utilizar como autenticação forte sem mecanismo adicional.
+## Segurança e condições de uso
+
+- O sistema envolve interfaces Wi-Fi, HTTP e código de comunicação Bluetooth; todas devem ser avaliadas quanto a autenticação, autorização e possibilidade de acionar o relé indevidamente.
+- HTTP sem TLS não fornece confidencialidade ou proteção adequada das credenciais. Mantenha o hardware em rede de teste isolada.
+- O UID de cartões RFID pode ser clonado conforme a tecnologia do cartão; não equivale a autenticação forte.
+- Credenciais de laboratório não devem ser reutilizadas em ambientes reais. Caso uma credencial tenha sido exposta em commits públicos, ela precisa ser substituída na origem.
+- Para uma fechadura real seriam necessários proteção do canal, gestão de sessões, testes físicos de falha segura e avaliação específica do hardware.
+
+**Finalidade:** prototipagem e pesquisa em bancada. O firmware não deve ser tratado como fechadura homologada ou solução comercial de controle de acesso.
 
 ## Documentação
-[Arquitetura](docs/ARQUITETURA.md) · [Requisitos](docs/REQUISITOS.md) · [UML](docs/UML.puml) · [Testes](docs/PLANO_TESTES.md) · [Instruções para IA](AGENTS.md).
 
-## Status
-Alteração de segurança em **revisão**. Compilação PlatformIO e testes de ponta a ponta no ESP32 ainda obrigatórios. Não há garantia de uso seguro em ambientes reais.
-
-## Documentação técnica Modulock v1.0.0
-
-- [Especificação do hardware e firmware](docs/projeto/ESPECIFICACAO.md)
-- [Três diagramas UML](docs/uml/README.md)
-- [Matriz de testes e segurança](docs/testes/PLANO_DE_TESTES.md)
-- [Controle de versão](docs/controle/VERSIONAMENTO.md)
-
-> Hardware físico: não considerar a implementação pronta para uma porta real sem testes de autenticação, Bluetooth e falha segura.
+[Requisitos](docs/REQUISITOS.md) · [Arquitetura](docs/ARQUITETURA.md) · [Especificação do firmware](docs/projeto/ESPECIFICACAO.md) · [Diagramas](docs/uml/README.md) · [Testes e segurança](docs/testes/PLANO_DE_TESTES.md) · [Versionamento](docs/controle/VERSIONAMENTO.md).
