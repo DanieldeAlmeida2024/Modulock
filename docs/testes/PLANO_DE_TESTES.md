@@ -33,3 +33,11 @@ Executar inicialmente **sem fechadura energizada**. Usar uma carga de teste adeq
 
 ## Automação disponível e pendências
 `platformio.ini` define o alvo `esp32dev`; não foi localizada suíte de firmware/HIL. Este documento especifica **casos a implementar**, não resultados PASS. A verificação física exige equipamento e registro de evidências. Como risco conhecido, o tratamento de Bluetooth deve ser revisado antes de considerar o sistema seguro.
+
+## Alterações de mitigação (13/11/2026)
+
+- O parser Bluetooth sem autenticação foi removido do caminho de execução e do código.
+- HTTP administrativo não inicia por padrão: `MODULOCK_ENABLE_UNENCRYPTED_ADMIN_HTTP=0`.
+- Loop de RFID e temporizadores deixa de depender da flag de servidor web; evitar formatação automática de SPIFFS na inicialização.
+- Testes de regressão estáticos: `python -m unittest discover -s tests -v`, também no workflow `security-contract.yml`.
+- **Pendente P0:** compilar no PlatformIO, testar comportamento com dispositivo/relé em bancada isolada, autenticação de cartão não clonável, TLS e isolamento/revogação de sessão. Não conectar a fechadura real.
