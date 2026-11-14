@@ -1,0 +1,8 @@
+@startuml
+title MOD-TIMER: desenergização segura
+[*] --> Inativo
+Inativo --> Ativo: digitalWrite(LOW) / start=millis / active=true
+Ativo --> Ativo: novo acionamento / start=millis
+Ativo --> Expirado: uint32(now-start) >= duration
+Expirado --> Inativo: digitalWrite(HIGH) / active=false
+@enduml

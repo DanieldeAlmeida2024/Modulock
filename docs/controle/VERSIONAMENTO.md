@@ -19,3 +19,9 @@
 - Regressões estáticas no Python e compilação PlatformIO em CI.
 
 A origem está no PR de segurança com base na `main`. Esta revisão **não** aprova uso como fechadura real: faltam testes físicos e autenticação criptográfica adequada.
+
+## MOD-TIMER v2.4.0 proposta — 14/11/2026
+
+- Temporizadores para relé e LEDs deixam de usar `millis() + prazo` e `millis() >= prazo`, adotando delta modular com atividade explícita.
+- Incluídos testes C++ host de overflow e verificações de wiring em Python, sem flash ou atuação de hardware.
+- Evidência de validação automatizada deve acompanhar o PR; HIL permanece necessário para produto físico.

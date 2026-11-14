@@ -8,6 +8,8 @@
 #include <SPIFFS.h>
 #include <esp_system.h>
 #include <cstring>
+#include <stdint.h>
+#include "ModulockTimingPolicy.h"
 #if __has_include("ModulockSecrets.h")
 #include "ModulockSecrets.h"
 #else
@@ -44,9 +46,12 @@ DynamicJsonDocument usersDoc(8192);
 
 String lastScannedUidForRegistration = "";
 unsigned long lastUidScanTime = 0;
-unsigned long relayOffTime = 0; 
-unsigned long greenLedOffTime = 0; 
-unsigned long redLedOffTime = 0;  
+uint32_t relayActivatedAtMs = 0;
+uint32_t greenLedActivatedAtMs = 0;
+uint32_t redLedActivatedAtMs = 0;
+bool relayActive = false;
+bool greenLedActive = false;
+bool redLedActive = false;
 
 void loadUsers();
 void saveUsers();
@@ -239,16 +244,19 @@ String findUserByRa(const String& ra) {
 
 void ativarRelePorta() {
   digitalWrite(pinRele, LOW);
-  relayOffTime = millis() + DOOR_OPEN_DURATION_MS;
+  relayActivatedAtMs = static_cast<uint32_t>(millis());
+  relayActive = true;
   Serial.println("Relé acionado.");
 }
 
 void flashLED(int pin) {
   digitalWrite(pin, HIGH);
   if (pin == ledVerde) {
-    greenLedOffTime = millis() + LED_FLASH_DURATION_MS;
+    greenLedActivatedAtMs = static_cast<uint32_t>(millis());
+    greenLedActive = true;
   } else if (pin == ledVermelho) {
-    redLedOffTime = millis() + LED_FLASH_DURATION_MS;
+    redLedActivatedAtMs = static_cast<uint32_t>(millis());
+    redLedActive = true;
   }
 }
 
@@ -716,17 +724,18 @@ void setup() {
 
 
 void loop() {
-  if (relayOffTime != 0 && millis() >= relayOffTime) {
-    digitalWrite(pinRele, HIGH);
-    relayOffTime = 0;
+  const uint32_t nowMs = static_cast<uint32_t>(millis());
+  if (modulockTimedActionExpired(relayActive, nowMs, relayActivatedAtMs, DOOR_OPEN_DURATION_MS)) {
+    digitalWrite(pinRele, HIGH); // HIGH = relé desenergizado
+    relayActive = false;
   }
-  if (greenLedOffTime != 0 && millis() >= greenLedOffTime) {
+  if (modulockTimedActionExpired(greenLedActive, nowMs, greenLedActivatedAtMs, LED_FLASH_DURATION_MS)) {
     digitalWrite(ledVerde, LOW);
-    greenLedOffTime = 0;
+    greenLedActive = false;
   }
-  if (redLedOffTime != 0 && millis() >= redLedOffTime) {
+  if (modulockTimedActionExpired(redLedActive, nowMs, redLedActivatedAtMs, LED_FLASH_DURATION_MS)) {
     digitalWrite(ledVermelho, LOW);
-    redLedOffTime = 0;
+    redLedActive = false;
   }
 
   if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {

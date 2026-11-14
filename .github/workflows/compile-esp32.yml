@@ -18,3 +18,14 @@ jobs:
         run: python -m pip install 'platformio>=6.1,<7'
       - name: Compilar somente (sem upload e sem credenciais)
         run: pio run -e esp32dev
+  timer-policy:
+    name: Política de temporização rollover (sem dispositivo)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Testar delta modular em host C++11
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/test_timers.cpp -o /tmp/modulock-timers
+          /tmp/modulock-timers
+      - name: Validar integração no firmware
+        run: python3 -m unittest discover -s test -p 'test_timing_wiring.py' -v
