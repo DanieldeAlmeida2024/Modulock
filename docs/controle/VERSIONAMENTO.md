@@ -25,3 +25,9 @@ A origem está no PR de segurança com base na `main`. Esta revisão **não** ap
 - Temporizadores para relé e LEDs deixam de usar `millis() + prazo` e `millis() >= prazo`, adotando delta modular com atividade explícita.
 - Incluídos testes C++ host de overflow e verificações de wiring em Python, sem flash ou atuação de hardware.
 - Evidência de validação automatizada deve acompanhar o PR; HIL permanece necessário para produto físico.
+
+## MOD-HTTP-GATE v2.5.0 · 14/11/2026
+
+- Defeito comprovado: gate HTTP previsto fora da linguagem executável, inserido no HTML bruto do painel; removido da string e movido a `setup()` antes de Wi-Fi/servidor.
+- Teste foi fortalecido para avaliar posição, unicidade e ausência no HTML, além de compilar firmware.
+- Sem alteração de hardware. Continua exigindo HIL e credenciais seguras; macro 1 só para laboratório isolado.

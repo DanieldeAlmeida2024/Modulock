@@ -440,12 +440,6 @@ void handleDashboard(AsyncWebServerRequest *request) {
               alert(data);
               loadUsers();
 
-  // O leitor RFID local não depende da interface web, mas exige testes
-  // físicos e cartões de autenticação robustos antes de qualquer uso real.
-  if (!MODULOCK_ENABLE_UNENCRYPTED_ADMIN_HTTP) {
-    Serial.println("Painel HTTP desabilitado: conexao sem TLS.");
-    return;
-  }
             })
             .catch(error => console.error('Error removing user:', error));
           }
@@ -667,6 +661,13 @@ void setup() {
   // Entrada de comandos Bluetooth permanece desativada, pois nao autenticava operadores.
   // Um protocolo autenticado deve ser implementado e testado antes de reativar.
   Serial.println("Bluetooth de comandos desativado por seguranca.");
+
+  // Lab HTTP opt-in: por padrão RFID local continua sem Wi-Fi/servidor.
+  // Este gate deve permanecer no C++ setup(), nunca no HTML embutido.
+  if (!MODULOCK_ENABLE_UNENCRYPTED_ADMIN_HTTP) {
+    Serial.println("Painel HTTP desabilitado por padrao; apenas RFID local ativo.");
+    return;
+  }
 
   // SSID e senha nunca sao registrados em logs.
   if (strlen(WIFI_SSID) == 0 || strlen(WIFI_PASSWORD) == 0 ||
