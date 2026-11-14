@@ -42,3 +42,7 @@ ESP32, leitor RFID MFRC522, módulo relé, LEDs, fonte e conversor elétrico apr
 ## Temporização do relé e LEDs — tolerante a overflow
 
 O relé (GPIO4) e os LEDs (GPIO13/14) usam diferenças modulares de `millis()` com flags explícitas de atividade. A correção evita que a comparação absoluta de prazo desligue cedo após o wrap do contador de 32 bits (~49,7 dias). Testes C++11 em host e build PlatformIO são automatizados; **não equivalem a ensaio HIL**, portanto não conectar a fechaduras reais antes de validar temporização, brownout, reset, sensores e falha segura no hardware.
+
+## Gate HTTP auditado no fluxo executável
+
+A revisão de 14/11/2026 identificou que a condição que desabilitava HTTP por padrão estava indevidamente incorporada ao HTML da dashboard. O gate foi movido para `setup()` antes de `WiFi.begin()`, garantindo que a configuração padrão mantenha o painel desligado, mas preserve RFID local. O CI agora testa a **posição exata do gate** e compila o ESP32, não apenas a presença de uma string. Detalhes e limites: [MOD-HTTP-GATE](docs/seguranca/BOOT_HTTP_FAIL_CLOSED.md).
