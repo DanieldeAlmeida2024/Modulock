@@ -22,6 +22,27 @@ class TestesSegurancaPadrao(unittest.TestCase):
         self.assertNotIn(gate, html)
 
 
+    def test_admin_session_is_issued_only_after_valid_login(self):
+        login = SOURCE.split("void handleLogin(AsyncWebServerRequest *request) {", 1)[1].split("void handleLogout(", 1)[0]
+        self.assertIn("username == WEB_USERNAME && password == WEB_PASSWORD", login)
+        self.assertIn("iniciarSessaoAdministrativa();", login)
+        self.assertGreater(login.index("iniciarSessaoAdministrativa();"),
+                           login.index("username == WEB_USERNAME && password == WEB_PASSWORD"))
+        setup = SOURCE.split("void setup() {", 1)[1].split("void loop() {", 1)[0]
+        self.assertNotIn("esp_random()", setup)
+        self.assertIn("Max-Age=900", login)
+
+    def test_expiration_and_logout_revoke_server_token(self):
+        session = SOURCE.split("bool isAuthenticated(AsyncWebServerRequest *request) {", 1)[1].split("void handleRoot(", 1)[0]
+        self.assertIn("sessaoAtiva", session)
+        self.assertIn("millis() - sessaoEmitidaEmMs", session)
+        self.assertIn("SESSAO_TTL_MS", session)
+        logout = SOURCE.split("void handleLogout(AsyncWebServerRequest *request) {", 1)[1].split("void handleDashboard(", 1)[0]
+        self.assertIn("sessaoAtiva = false;", logout)
+        self.assertIn('identificadorSessao = "";', logout)
+        self.assertIn("Max-Age=0", logout)
+        self.assertIn('server.on("/logout", HTTP_POST, handleLogout);', SOURCE)
+
     def test_bluetooth_sem_comandos_de_abertura(self):
         self.assertNotIn("BluetoothSerial", SOURCE)
         self.assertNotIn("processarComandoBluetooth", SOURCE)

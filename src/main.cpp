@@ -35,6 +35,9 @@ const char* WIFI_SSID = MODULOCK_WIFI_SSID;
 const char* WIFI_PASSWORD = MODULOCK_WIFI_PASSWORD;
 
 String identificadorSessao;
+uint32_t sessaoEmitidaEmMs = 0;
+bool sessaoAtiva = false;
+const uint32_t SESSAO_TTL_MS = 15UL * 60UL * 1000UL;
 
 const unsigned long DOOR_OPEN_DURATION_MS = 1000; 
 const unsigned long LED_FLASH_DURATION_MS = 2000; 
@@ -64,6 +67,8 @@ String findUserByRa(const String& ra);
 bool isAuthenticated(AsyncWebServerRequest *request); 
 void handleRoot(AsyncWebServerRequest *request);
 void handleLogin(AsyncWebServerRequest *request);
+void handleLogout(AsyncWebServerRequest *request);
+void iniciarSessaoAdministrativa();
 void handleDashboard(AsyncWebServerRequest *request); 
 void handleAbrirPorta(AsyncWebServerRequest *request);
 void handleNotFound(AsyncWebServerRequest *request);
@@ -261,9 +266,27 @@ void flashLED(int pin) {
 }
 
 
+// Iniciar somente após credenciais válidas; novo login revoga o token anterior.
+void iniciarSessaoAdministrativa() {
+  identificadorSessao = "";
+  identificadorSessao.reserve(64);
+  for (int i = 0; i < 8; ++i) {
+    char parte[9];
+    snprintf(parte, sizeof(parte), "%08x", static_cast<unsigned int>(esp_random()));
+    identificadorSessao += parte;
+  }
+  sessaoEmitidaEmMs = static_cast<uint32_t>(millis());
+  sessaoAtiva = true;
+}
+
 // A presenca de Cookie nao basta: seu valor deve coincidir com a sessao vigente.
 bool isAuthenticated(AsyncWebServerRequest *request) {
-  if (identificadorSessao.isEmpty() || !request->hasHeader("Cookie")) return false;
+  if (!sessaoAtiva || identificadorSessao.isEmpty() || !request->hasHeader("Cookie")) return false;
+  if (static_cast<uint32_t>(millis() - sessaoEmitidaEmMs) >= SESSAO_TTL_MS) {
+    sessaoAtiva = false;
+    identificadorSessao = "";
+    return false;
+  }
   String cookies = request->getHeader("Cookie")->value();
   int inicio = 0;
   while (inicio < cookies.length()) {
@@ -334,8 +357,9 @@ void handleLogin(AsyncWebServerRequest *request) {
     String password = request->getParam("password", true)->value();
 
     if (username == WEB_USERNAME && password == WEB_PASSWORD) {
+      iniciarSessaoAdministrativa();
       AsyncWebServerResponse *response = request->beginResponse(302, "text/plain", "");
-      response->addHeader("Set-Cookie", "session_id=" + identificadorSessao + "; Path=/; HttpOnly; SameSite=Strict"); 
+      response->addHeader("Set-Cookie", "session_id=" + identificadorSessao + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=900"); 
       response->addHeader("Location", "/dashboard");
       request->send(response);
 
@@ -345,6 +369,19 @@ void handleLogin(AsyncWebServerRequest *request) {
   } else {
     request->redirect("/?error=1");
   }
+}
+
+void handleLogout(AsyncWebServerRequest *request) {
+  if (!isAuthenticated(request)) {
+    request->send(401, "text/plain", "Sessao invalida.");
+    return;
+  }
+  sessaoAtiva = false;
+  identificadorSessao = "";
+  auto *response = request->beginResponse(302, "text/plain", "");
+  response->addHeader("Set-Cookie", "session_id=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
+  response->addHeader("Location", "/");
+  request->send(response);
 }
 
 void handleDashboard(AsyncWebServerRequest *request) {
@@ -675,12 +712,7 @@ void setup() {
     Serial.println("Configure include/ModulockSecrets.h com credenciais locais seguras.");
     return;
   }
-  identificadorSessao.reserve(64);
-  for (int i = 0; i < 8; ++i) {
-    char parte[9];
-    snprintf(parte, sizeof(parte), "%08x", static_cast<unsigned int>(esp_random()));
-    identificadorSessao += parte;
-  }
+  // Nunca emitir token administrativo no boot: emissão ocorre só após login.
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   unsigned long inicioConexao = millis();
@@ -700,6 +732,7 @@ void setup() {
 
   server.on("/", HTTP_GET, handleRoot);
   server.on("/login", HTTP_POST, handleLogin);
+  server.on("/logout", HTTP_POST, handleLogout);
   server.on("/dashboard", HTTP_GET, handleDashboard); 
 
   server.on("/openDoor", HTTP_POST, handleAbrirPorta);
