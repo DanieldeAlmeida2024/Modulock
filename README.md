@@ -15,6 +15,16 @@ ESP32, leitor RFID MFRC522, módulo relé, LEDs, fonte e conversor elétrico apr
 5. Grave com `pio run -t upload` somente após conferir a montagem.
 6. Valide o armazenamento SPIFFS e os estados do relé em condições de erro.
 
+## Proteções padrão de rede e autenticação
+
+- A interface administrativa HTTP sem TLS está **desligada por padrão**. O firmware não inicia o painel sem `MODULOCK_ENABLE_UNENCRYPTED_ADMIN_HTTP=1`, configurado exclusivamente no header local, para bancada isolada.
+- O parser Bluetooth de comandos foi removido, incluindo comandos de abertura e modificação de usuários sem autenticação.
+- A rotina de leitura RFID e o desligamento do relé continuam sendo executados sem depender de Wi-Fi ou do painel web.
+- `SPIFFS.begin(false)` evita formatação automática do armazenamento se a montagem falhar.
+- As verificações automáticas compilam o firmware e procuram regressões estáticas de segurança. Não substituem ensaios com a placa e o relé.
+
+**Atenção:** a autenticação baseada apenas no UID RFID pode ser clonada. Mesmo com essas proteções, **não instalar como fechadura de segurança real** sem hardware apropriado, protocolos criptográficos e ensaios físicos.
+
 ## Segurança e condições de uso
 
 - O sistema envolve interfaces Wi-Fi, HTTP e código de comunicação Bluetooth; todas devem ser avaliadas quanto a autenticação, autorização e possibilidade de acionar o relé indevidamente.
