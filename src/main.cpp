@@ -1,7 +1,6 @@
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <BluetoothSerial.h>
 #include <SPI.h>
 #include <MFRC522.h>
 #include <ArduinoJson.h>
@@ -13,6 +12,12 @@
 #include "ModulockSecrets.h"
 #else
 #include "ModulockSecrets.example.h"
+#endif
+
+// Painel administrativo em HTTP não cifrado permanece desabilitado por padrão.
+// Ativar só em rede isolada de bancada; nunca expor na Internet.
+#ifndef MODULOCK_ENABLE_UNENCRYPTED_ADMIN_HTTP
+#define MODULOCK_ENABLE_UNENCRYPTED_ADMIN_HTTP 0
 #endif
 
 #define RST_PIN 22   
@@ -28,14 +33,12 @@ const char* WIFI_SSID = MODULOCK_WIFI_SSID;
 const char* WIFI_PASSWORD = MODULOCK_WIFI_PASSWORD;
 
 String identificadorSessao;
-bool servidorHabilitado = false; 
 
 const unsigned long DOOR_OPEN_DURATION_MS = 1000; 
 const unsigned long LED_FLASH_DURATION_MS = 2000; 
 const unsigned long UID_SCAN_TIMEOUT_MS = 30000; 
 MFRC522 rfid(SS_PIN, RST_PIN);
 AsyncWebServer server(80);
-BluetoothSerial SerialBT;
 
 DynamicJsonDocument usersDoc(8192);
 
@@ -69,7 +72,6 @@ void handleGetLastScannedUid(AsyncWebServerRequest *request);
 
 void ativarRelePorta();
 void flashLED(int pin);
-void processarComandoBluetooth(const String& command);
 String getUidHexString(byte *uidBytes, byte uidSize);
 
 
@@ -428,7 +430,14 @@ void handleDashboard(AsyncWebServerRequest *request) {
             .then(response => response.text())
             .then(data => {
               alert(data);
-              loadUsers(); 
+              loadUsers();
+
+  // O leitor RFID local não depende da interface web, mas exige testes
+  // físicos e cartões de autenticação robustos antes de qualquer uso real.
+  if (!MODULOCK_ENABLE_UNENCRYPTED_ADMIN_HTTP) {
+    Serial.println("Painel HTTP desabilitado: conexao sem TLS.");
+    return;
+  }
             })
             .catch(error => console.error('Error removing user:', error));
           }
@@ -450,7 +459,6 @@ void handleAbrirPorta(AsyncWebServerRequest *request) {
       request->send(401, "text/plain", "Não autorizado. Faça login.");
       return;
   }
-  SerialBT.println("Web: Porta Aberta");
   ativarRelePorta();
   flashLED(ledVerde);
   request->send(200, "text/plain", "Porta aberta com sucesso!");
@@ -625,52 +633,6 @@ void handleNotFound(AsyncWebServerRequest *request) {
   request->send(404, "text/plain", "Página Não Encontrada");
 }
 
-void processarComandoBluetooth(const String& command) {
-  String cmd = command;
-  cmd.trim();
-  cmd.toUpperCase();
-
-  Serial.print("Comando Bluetooth recebido: ");
-  Serial.println(cmd);
-
-  if (cmd == "OPEN DOOR") {
-    SerialBT.println("BT: Porta Aberta");
-    ativarRelePorta();
-    flashLED(ledVerde);
-  } else if (cmd.startsWith("ADD USER ")) {
-    int firstComma = cmd.indexOf(',');
-    int secondComma = cmd.indexOf(',', firstComma + 1);
-    if (firstComma != -1 && secondComma != -1) {
-      String ra = cmd.substring(9, firstComma);
-      String name = cmd.substring(firstComma + 1, secondComma);
-      String uid = cmd.substring(secondComma + 1);
-
-      if (addUser(ra, name, uid)) {
-        SerialBT.println("BT: Usuário " + name + " (RA: " + ra + ") adicionado.");
-      } else {
-        SerialBT.println("BT: Falha ao adicionar usuário. RA ou UID podem existir.");
-      }
-    } else {
-      SerialBT.println("BT: Formato de comando inválido. Use 'ADD USER RA,NOME,UID'");
-    }
-  } else if (cmd.startsWith("REMOVE USER ")) {
-    String raToRemove = cmd.substring(12);
-    if (removeUser(raToRemove)) {
-      SerialBT.println("BT: Usuário " + raToRemove + " removido.");
-    } else {
-      SerialBT.println("BT: Usuário " + raToRemove + " não encontrado.");
-    }
-  } else if (cmd == "GET USERS") {
-    String jsonResponse;
-    serializeJson(usersDoc, jsonResponse);
-    SerialBT.print("BT: Usuários Registrados: ");
-    SerialBT.println(jsonResponse);
-  }
-  else {
-    SerialBT.println("BT: Comando desconhecido. Comandos: OPEN DOOR, ADD USER RA,NOME,UID, REMOVE USER RA, GET USERS");
-  }
-}
-
 // --- Função Setup ---
 
 void setup() {
@@ -685,7 +647,7 @@ void setup() {
   digitalWrite(ledVerde, LOW);
   digitalWrite(ledVermelho, LOW);
 
-  if (!SPIFFS.begin(true)) {
+  if (!SPIFFS.begin(false)) {
     Serial.println("Erro ao montar o SPIFFS! Verifique se a partição está correta.");
     while(true); 
   }
@@ -749,13 +711,11 @@ void setup() {
   server.onNotFound(handleNotFound);
 
   server.begin();
-  servidorHabilitado = true;
   Serial.println("Servidor Web iniciado!");
 }
 
 
 void loop() {
-  if (!servidorHabilitado) { delay(1000); return; }
   if (relayOffTime != 0 && millis() >= relayOffTime) {
     digitalWrite(pinRele, HIGH);
     relayOffTime = 0;
@@ -776,12 +736,11 @@ void loop() {
     lastUidScanTime = millis();
 
     if (isAuthorized(rfid.uid.uidByte)) {
-      String userName = findUserByUid(rfid.uid.uidByte);
-      SerialBT.println("RFID: Autorizado - Porta Aberta para " + userName);
+      Serial.println("RFID: acesso autorizado.");
       ativarRelePorta();
       flashLED(ledVerde);
     } else {
-      SerialBT.println("RFID: Não Autorizado");
+      Serial.println("RFID: acesso negado.");
       flashLED(ledVermelho);
     }
 
@@ -789,8 +748,5 @@ void loop() {
     rfid.PCD_StopCrypto1();
   }
 
-  if (SerialBT.available()) {
-    String command = SerialBT.readStringUntil('\n');
-    processarComandoBluetooth(command);
-  }
+
 }
